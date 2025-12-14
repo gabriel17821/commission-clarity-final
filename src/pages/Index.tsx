@@ -196,14 +196,17 @@ const Index = () => {
 
           <TabsContent value="breakdown">
             <MonthlyBreakdown 
-              invoices={invoices} 
+              invoices={invoices}
+              clients={clients}
               onUpdateInvoice={updateInvoice} 
               onDeleteInvoice={deleteInvoice}
+              onRefreshInvoices={refetchInvoices}
+              sellerName={activeSeller?.name}
             />
           </TabsContent>
 
           <TabsContent value="statistics">
-            <Statistics invoices={invoices} />
+            <Statistics invoices={invoices} sellerName={activeSeller?.name} clients={clients} />
           </TabsContent>
         </Tabs>
       </main>

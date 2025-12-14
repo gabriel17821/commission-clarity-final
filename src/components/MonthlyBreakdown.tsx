@@ -3,16 +3,20 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Invoice } from '@/hooks/useInvoices';
+import { Client } from '@/hooks/useClients';
 import { formatCurrency, formatNumber } from '@/lib/formatters';
 import { format, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Calendar, Package, FileDown, Loader2, Pencil } from 'lucide-react';
+import { Calendar, Package, FileDown, Loader2, Pencil, User } from 'lucide-react';
 import { generateBreakdownPdf } from '@/lib/pdfGenerator';
 import { toast } from 'sonner';
 import { EditInvoiceDialog } from '@/components/EditInvoiceDialog';
+import { EditGlobalPercentageDialog } from '@/components/EditGlobalPercentageDialog';
+import { supabase } from '@/integrations/supabase/client';
 
 interface MonthlyBreakdownProps {
   invoices: Invoice[];
+  clients?: Client[];
   onUpdateInvoice?: (
     id: string,
     ncf: string,
@@ -25,12 +29,16 @@ interface MonthlyBreakdownProps {
     products: { name: string; amount: number; percentage: number; commission: number }[]
   ) => Promise<any>;
   onDeleteInvoice?: (id: string) => Promise<boolean>;
+  onRefreshInvoices?: () => void;
+  sellerName?: string;
 }
 
 interface ProductEntry {
   ncf: string;
   date: string;
   amount: number;
+  clientId?: string | null;
+  clientName?: string;
 }
 
 interface ProductBreakdown {
@@ -59,13 +67,19 @@ const getMonthKey = (date: Date): string => {
   return `${year}-${month}`;
 };
 
-export const MonthlyBreakdown = ({ invoices, onUpdateInvoice, onDeleteInvoice }: MonthlyBreakdownProps) => {
+export const MonthlyBreakdown = ({ invoices, clients, onUpdateInvoice, onDeleteInvoice, onRefreshInvoices, sellerName }: MonthlyBreakdownProps) => {
   // Initialize with current month
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
     const now = new Date();
     return getMonthKey(now);
   });
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  const getClientName = (clientId?: string | null) => {
+    if (!clientId || !clients) return undefined;
+    const client = clients.find(c => c.id === clientId);
+    return client?.name;
+  };
 
   // Generate available months - always show last 4 months plus any with invoices
   const months = useMemo(() => {
@@ -98,11 +112,12 @@ export const MonthlyBreakdown = ({ invoices, onUpdateInvoice, onDeleteInvoice }:
     });
   }, [invoices, selectedMonth]);
 
-  // Agrupar por producto específico
   const productsBreakdown = useMemo(() => {
     const products: Record<string, ProductBreakdown> = {};
     
     filteredInvoices.forEach(invoice => {
+      const clientName = getClientName((invoice as any).client_id);
+      
       invoice.products?.forEach(product => {
         if (product.amount <= 0) return;
         
@@ -121,6 +136,8 @@ export const MonthlyBreakdown = ({ invoices, onUpdateInvoice, onDeleteInvoice }:
           ncf: invoice.ncf,
           date: invoice.invoice_date || invoice.created_at,
           amount: Number(product.amount),
+          clientId: (invoice as any).client_id,
+          clientName,
         });
         products[key].totalAmount += Number(product.amount);
         products[key].totalCommission += Number(product.commission);
@@ -128,7 +145,7 @@ export const MonthlyBreakdown = ({ invoices, onUpdateInvoice, onDeleteInvoice }:
     });
     
     return Object.values(products).sort((a, b) => b.totalAmount - a.totalAmount);
-  }, [filteredInvoices]);
+  }, [filteredInvoices, clients]);
 
   // Resto de productos (25%)
   const restBreakdown = useMemo(() => {
@@ -138,10 +155,13 @@ export const MonthlyBreakdown = ({ invoices, onUpdateInvoice, onDeleteInvoice }:
     
     filteredInvoices.forEach(inv => {
       if (inv.rest_amount > 0) {
+        const clientName = getClientName((inv as any).client_id);
         entries.push({
           ncf: inv.ncf,
           date: inv.invoice_date || inv.created_at,
           amount: Number(inv.rest_amount),
+          clientId: (inv as any).client_id,
+          clientName,
         });
         totalAmount += Number(inv.rest_amount);
         totalCommission += Number(inv.rest_commission);
@@ -149,7 +169,50 @@ export const MonthlyBreakdown = ({ invoices, onUpdateInvoice, onDeleteInvoice }:
     });
     
     return { entries, totalAmount, totalCommission };
-  }, [filteredInvoices]);
+  }, [filteredInvoices, clients]);
+
+  // Function to update global percentage
+  const handleUpdateGlobalPercentage = async (productName: string, newPercentage: number): Promise<boolean> => {
+    try {
+      // Get all invoice_products for this product in the filtered invoices
+      const invoiceIds = filteredInvoices.map(i => i.id);
+      
+      // Update percentage and recalculate commission for each affected invoice_product
+      for (const invoice of filteredInvoices) {
+        const productToUpdate = invoice.products?.find(p => p.product_name === productName);
+        if (!productToUpdate) continue;
+        
+        const newCommission = (productToUpdate.amount * newPercentage) / 100;
+        
+        await supabase
+          .from('invoice_products')
+          .update({ 
+            percentage: newPercentage,
+            commission: newCommission 
+          })
+          .eq('invoice_id', invoice.id)
+          .eq('product_name', productName);
+        
+        // Recalculate and update total commission for the invoice
+        const otherProducts = invoice.products?.filter(p => p.product_name !== productName) || [];
+        const otherCommissions = otherProducts.reduce((sum, p) => sum + Number(p.commission), 0);
+        const newTotalCommission = otherCommissions + newCommission + Number(invoice.rest_commission);
+        
+        await supabase
+          .from('invoices')
+          .update({ total_commission: newTotalCommission })
+          .eq('id', invoice.id);
+      }
+      
+      toast.success(`Porcentaje de ${productName} actualizado a ${newPercentage}% en ${filteredInvoices.length} facturas`);
+      onRefreshInvoices?.();
+      return true;
+    } catch (error) {
+      console.error('Error updating global percentage:', error);
+      toast.error('Error al actualizar el porcentaje');
+      return false;
+    }
+  };
 
   const grandTotalCommission = useMemo(() => {
     return productsBreakdown.reduce((sum, p) => sum + p.totalCommission, 0) + restBreakdown.totalCommission;
@@ -170,6 +233,7 @@ export const MonthlyBreakdown = ({ invoices, onUpdateInvoice, onDeleteInvoice }:
         products: productsBreakdown,
         rest: restBreakdown,
         grandTotal: grandTotalCommission,
+        sellerName,
       }, selectedMonth);
       toast.success('PDF generado correctamente');
     } catch (error) {
@@ -270,58 +334,71 @@ export const MonthlyBreakdown = ({ invoices, onUpdateInvoice, onDeleteInvoice }:
         </Card>
       ) : (
         <>
-          {/* Product Cards Grid - Diseño Limpio y Moderno */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
+          {/* Product Cards Grid - Layout horizontal en desktop */}
+          <div className="space-y-4">
             {productsBreakdown.map((product, index) => (
               <Card 
                 key={product.name} 
-                className="overflow-hidden bg-card border border-border/60 shadow-sm hover:shadow-lg transition-all duration-300 animate-fade-in"
+                className="overflow-hidden bg-card border border-border/60 shadow-sm hover:shadow-md transition-all duration-300 animate-fade-in"
                 style={{ animationDelay: `${index * 80}ms` }}
               >
                 {/* Product Header */}
                 <div className="px-5 py-4 bg-muted/30 border-b border-border/50">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-lg text-foreground">{product.name}</h3>
+                    <div className="flex items-center gap-3">
+                      <h3 className="font-semibold text-lg text-foreground">{product.name}</h3>
+                      <EditGlobalPercentageDialog
+                        productName={product.name}
+                        currentPercentage={product.percentage}
+                        invoiceCount={product.entries.length}
+                        month={capitalizedMonth}
+                        onUpdate={(newPercentage) => handleUpdateGlobalPercentage(product.name, newPercentage)}
+                      />
+                    </div>
                     <span className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-sm font-bold">
                       {product.percentage}%
                     </span>
                   </div>
                 </div>
                 
-                {/* Entries */}
                 <div className="p-5">
+                  {/* Entries Table */}
                   <div className="space-y-2 mb-4 max-h-48 overflow-y-auto">
                     {product.entries.map((entry, i) => (
                       <div 
                         key={i} 
                         className="flex items-center justify-between text-sm py-2.5 px-3 rounded-lg bg-muted/40 hover:bg-muted/60 transition-colors"
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-foreground font-medium font-mono text-xs">
-                              {entry.ncf}
+                        <div className="flex flex-col gap-0.5">
+                          {entry.clientName && (
+                            <span className="text-foreground font-medium text-sm flex items-center gap-1">
+                              <User className="h-3 w-3 text-primary" />
+                              {entry.clientName}
                             </span>
-                            <span className="text-muted-foreground text-xs">
-                              {format(parseInvoiceDate(entry.date), 'd MMM yyyy', { locale: es })}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-foreground">
-                              ${formatNumber(entry.amount)}
-                            </span>
-                            {onUpdateInvoice && onDeleteInvoice && (
-                              <EditInvoiceDialog
-                                invoice={filteredInvoices.find(inv => inv.ncf === entry.ncf)!}
-                                onUpdate={onUpdateInvoice}
-                                onDelete={onDeleteInvoice}
-                                trigger={
-                                  <Button variant="ghost" size="icon" className="h-6 w-6">
-                                    <Pencil className="h-3 w-3" />
-                                  </Button>
-                                }
-                              />
-                            )}
-                          </div>
+                          )}
+                          <span className="text-muted-foreground font-mono text-xs">
+                            {entry.ncf}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-muted-foreground text-xs">
+                            {format(parseInvoiceDate(entry.date), 'd MMM', { locale: es })}
+                          </span>
+                          <span className="font-semibold text-foreground">
+                            ${formatNumber(entry.amount)}
+                          </span>
+                          {onUpdateInvoice && onDeleteInvoice && (
+                            <EditInvoiceDialog
+                              invoice={filteredInvoices.find(inv => inv.ncf === entry.ncf)!}
+                              onUpdate={onUpdateInvoice}
+                              onDelete={onDeleteInvoice}
+                              trigger={
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary">
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                              }
+                            />
+                          )}
                         </div>
                       </div>
                     ))}
@@ -330,23 +407,19 @@ export const MonthlyBreakdown = ({ invoices, onUpdateInvoice, onDeleteInvoice }:
                   {/* Línea divisoria */}
                   <div className="border-t-2 border-dashed border-border my-4" />
                   
-                  {/* Subtotal */}
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-sm text-muted-foreground">Subtotal</span>
-                    <span className="font-bold text-xl text-foreground">
-                      ${formatNumber(product.totalAmount)}
-                    </span>
-                  </div>
-                  
-                  {/* Comisión */}
-                  <div className="p-4 rounded-xl bg-success/10 border border-success/20">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-success font-medium">
-                        Comisión ({product.percentage}%)
-                      </span>
-                      <span className="font-bold text-2xl text-success">
-                        ${formatCurrency(product.totalCommission)}
-                      </span>
+                  {/* Summary Row */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div>
+                        <span className="text-xs text-muted-foreground">Subtotal</span>
+                        <p className="font-bold text-lg text-foreground">${formatNumber(product.totalAmount)}</p>
+                      </div>
+                    </div>
+                    
+                    {/* Comisión */}
+                    <div className="px-5 py-3 rounded-xl bg-success/10 border border-success/20">
+                      <span className="text-xs text-success font-medium">Comisión ({product.percentage}%)</span>
+                      <p className="font-bold text-2xl text-success">${formatCurrency(product.totalCommission)}</p>
                     </div>
                   </div>
                 </div>
@@ -356,7 +429,7 @@ export const MonthlyBreakdown = ({ invoices, onUpdateInvoice, onDeleteInvoice }:
             {/* Resto de Productos Card */}
             {restBreakdown.totalAmount > 0 && (
               <Card 
-                className="overflow-hidden bg-card border border-border/60 shadow-sm hover:shadow-lg transition-all duration-300 animate-fade-in"
+                className="overflow-hidden bg-card border border-border/60 shadow-sm hover:shadow-md transition-all duration-300 animate-fade-in"
                 style={{ animationDelay: `${productsBreakdown.length * 80}ms` }}
               >
                 {/* Header */}
@@ -369,7 +442,6 @@ export const MonthlyBreakdown = ({ invoices, onUpdateInvoice, onDeleteInvoice }:
                   </div>
                 </div>
                 
-                {/* Entries */}
                 <div className="p-5">
                   <div className="space-y-2 mb-4 max-h-48 overflow-y-auto">
                     {restBreakdown.entries.map((entry, i) => (
@@ -378,16 +450,24 @@ export const MonthlyBreakdown = ({ invoices, onUpdateInvoice, onDeleteInvoice }:
                         className="flex items-center justify-between text-sm py-2.5 px-3 rounded-lg bg-muted/40 hover:bg-muted/60 transition-colors"
                       >
                         <div className="flex flex-col gap-0.5">
-                          <span className="text-foreground font-medium font-mono text-xs">
+                          {entry.clientName && (
+                            <span className="text-foreground font-medium text-sm flex items-center gap-1">
+                              <User className="h-3 w-3 text-primary" />
+                              {entry.clientName}
+                            </span>
+                          )}
+                          <span className="text-muted-foreground font-mono text-xs">
                             {entry.ncf}
                           </span>
+                        </div>
+                        <div className="flex items-center gap-3">
                           <span className="text-muted-foreground text-xs">
-                            {format(parseInvoiceDate(entry.date), 'd MMM yyyy', { locale: es })}
+                            {format(parseInvoiceDate(entry.date), 'd MMM', { locale: es })}
+                          </span>
+                          <span className="font-semibold text-foreground">
+                            ${formatNumber(entry.amount)}
                           </span>
                         </div>
-                        <span className="font-semibold text-foreground">
-                          ${formatNumber(entry.amount)}
-                        </span>
                       </div>
                     ))}
                   </div>
@@ -395,23 +475,16 @@ export const MonthlyBreakdown = ({ invoices, onUpdateInvoice, onDeleteInvoice }:
                   {/* Línea divisoria */}
                   <div className="border-t-2 border-dashed border-border my-4" />
                   
-                  {/* Subtotal */}
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-sm text-muted-foreground">Subtotal</span>
-                    <span className="font-bold text-xl text-foreground">
-                      ${formatNumber(restBreakdown.totalAmount)}
-                    </span>
-                  </div>
-                  
-                  {/* Comisión */}
-                  <div className="p-4 rounded-xl bg-success/10 border border-success/20">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-success font-medium">
-                        Comisión (25%)
-                      </span>
-                      <span className="font-bold text-2xl text-success">
-                        ${formatCurrency(restBreakdown.totalCommission)}
-                      </span>
+                  {/* Summary Row */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <span className="text-xs text-muted-foreground">Subtotal</span>
+                      <p className="font-bold text-lg text-foreground">${formatNumber(restBreakdown.totalAmount)}</p>
+                    </div>
+                    
+                    <div className="px-5 py-3 rounded-xl bg-success/10 border border-success/20">
+                      <span className="text-xs text-success font-medium">Comisión (25%)</span>
+                      <p className="font-bold text-2xl text-success">${formatCurrency(restBreakdown.totalCommission)}</p>
                     </div>
                   </div>
                 </div>

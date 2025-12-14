@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Trash2, ChevronDown, Calendar, Receipt, Hash, TrendingUp, ArrowUpRight, ArrowDownRight, Sparkles, Pencil, User } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Invoice } from '@/hooks/useInvoices';
 import { Client } from '@/hooks/useClients';
 import { formatCurrency, formatNumber } from '@/lib/formatters';
@@ -304,6 +305,35 @@ export const InvoiceHistory = ({ invoices, loading, onDelete, onUpdateInvoice, c
                               </Button>
                             }
                           />
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>¿Eliminar factura?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Esta acción eliminará la factura {invoice.ncf} permanentemente.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={() => onDelete(invoice.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Eliminar
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                           <div className={`h-8 w-8 flex items-center justify-center transition-transform duration-200 ${
                             expandedInvoice === invoice.id ? 'rotate-180' : ''
                           }`}>

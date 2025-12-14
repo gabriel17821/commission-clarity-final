@@ -42,6 +42,8 @@ export const ClientSelector = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Only show suggestions when there's text to search
+  const shouldShowDropdown = showSuggestions && search.trim().length > 0;
   const handleSelectClient = (client: Client) => {
     onSelectClient(client);
     setSearch('');
@@ -107,8 +109,8 @@ export const ClientSelector = ({
             />
           </div>
 
-          {showSuggestions && (
-            <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-xl shadow-lg overflow-hidden animate-in fade-in-0 zoom-in-95">
+          {shouldShowDropdown && (
+            <div className="absolute z-[100] w-full mt-1 bg-popover border border-border rounded-xl shadow-xl overflow-hidden animate-in fade-in-0 zoom-in-95">
               {filteredClients.length > 0 ? (
                 <div className="max-h-48 overflow-y-auto">
                   {filteredClients.map((client) => (
@@ -129,11 +131,11 @@ export const ClientSelector = ({
                     </button>
                   ))}
                 </div>
-              ) : search.trim() ? (
+              ) : (
                 <div className="p-4 text-center text-muted-foreground text-sm">
                   No se encontraron clientes
                 </div>
-              ) : null}
+              )}
 
               <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogTrigger asChild>

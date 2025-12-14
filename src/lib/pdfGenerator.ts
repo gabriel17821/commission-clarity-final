@@ -29,6 +29,7 @@ interface BreakdownData {
     totalCommission: number;
   };
   grandTotal: number;
+  sellerName?: string;
 }
 
 // Parse date correctly
@@ -65,9 +66,9 @@ export const generateBreakdownPdf = async (data: BreakdownData, selectedMonth: s
 
   // Header - Light grey background instead of dark
   doc.setFillColor(colors.veryLightGrey);
-  doc.roundedRect(margin, yPos - 5, pageWidth - 2 * margin, 28, 4, 4, 'F');
+  doc.roundedRect(margin, yPos - 5, pageWidth - 2 * margin, 35, 4, 4, 'F');
   doc.setDrawColor(colors.border);
-  doc.roundedRect(margin, yPos - 5, pageWidth - 2 * margin, 28, 4, 4, 'S');
+  doc.roundedRect(margin, yPos - 5, pageWidth - 2 * margin, 35, 4, 4, 'S');
   
   doc.setTextColor(colors.darkGrey);
   doc.setFontSize(18);
@@ -79,7 +80,15 @@ export const generateBreakdownPdf = async (data: BreakdownData, selectedMonth: s
   doc.setTextColor(colors.mediumGrey);
   doc.text(data.month.toUpperCase(), pageWidth / 2, yPos + 14, { align: 'center' });
   
-  yPos = 55;
+  // Seller name
+  if (data.sellerName) {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(colors.darkGrey);
+    doc.text(`Vendedor: ${data.sellerName}`, pageWidth / 2, yPos + 22, { align: 'center' });
+  }
+  
+  yPos = data.sellerName ? 62 : 55;
 
   // Summary Box
   doc.setFillColor(colors.background);
@@ -97,10 +106,19 @@ export const generateBreakdownPdf = async (data: BreakdownData, selectedMonth: s
   data.rest.entries.forEach(e => uniqueNcfs.add(e.ncf));
   const invoiceCount = uniqueNcfs.size;
   
+  // Calculate products with variable commissions
+  const variableProductCount = data.products.length;
+  const hasRest = data.rest.totalAmount > 0;
+  
   doc.setTextColor(colors.darkGrey);
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
-  doc.text(`${productCount} Productos  •  ${invoiceCount} Facturas`, margin + 5, yPos + 10);
+  
+  const summaryText = hasRest 
+    ? `${variableProductCount} productos con comisiones variables + resto de facturas al 25%  •  ${invoiceCount} facturas`
+    : `${variableProductCount} productos con comisiones variables  •  ${invoiceCount} facturas`;
+  
+  doc.text(summaryText, margin + 5, yPos + 10);
   
   doc.setTextColor(colors.success);
   doc.setFontSize(12);

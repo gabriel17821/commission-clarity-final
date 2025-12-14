@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { BarChart3, TrendingUp, DollarSign, Receipt, Calendar, ChevronLeft, ChevronRight, FileText, ArrowUpRight, ArrowDownRight, Minus, ChevronDown } from 'lucide-react';
 import { Invoice } from '@/hooks/useInvoices';
+import { Client } from '@/hooks/useClients';
 import { formatCurrency, formatNumber } from '@/lib/formatters';
 import { format, startOfMonth, endOfMonth, isWithinInterval, subMonths, addMonths, isSameMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -13,6 +14,8 @@ import { AdvancedStatistics } from '@/components/AdvancedStatistics';
 
 interface StatisticsProps {
   invoices: Invoice[];
+  sellerName?: string;
+  clients?: Client[];
 }
 
 // Helper function to parse dates correctly without timezone issues
@@ -24,9 +27,11 @@ const parseInvoiceDate = (dateString: string): Date => {
   return new Date(dateString);
 };
 
-export const Statistics = ({ invoices }: StatisticsProps) => {
+export const Statistics = ({ invoices, sellerName, clients }: StatisticsProps) => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showAdvanced, setShowAdvanced] = useState(false);
+  
+  const displayName = sellerName || 'Vendedor';
 
   // Get available months from invoices
   const availableMonths = useMemo(() => {

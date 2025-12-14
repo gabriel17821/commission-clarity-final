@@ -115,38 +115,39 @@ export const CalculatorView = ({
     }
   }, [suggestedNcf]);
 
-  // Notificación de Última Factura - mejorada
+  // Notificación de Última Factura - compacta y elegante
   useEffect(() => {
     if (lastInvoice && !toastShownRef.current) {
       const date = parseDateSafe(lastInvoice.created_at);
       let timeAgo = isToday(date) 
-        ? `Hoy, hace ${formatDistanceToNow(date, { locale: es })}` 
-        : (isYesterday(date) ? `Ayer` : formatDistanceToNow(date, { addSuffix: true, locale: es }));
-      const exactTime = format(date, "h:mm a", { locale: es });
+        ? 'Hoy' 
+        : (isYesterday(date) ? 'Ayer' : format(date, 'd MMM', { locale: es }));
       
       toast.custom((t) => (
-        <div className="relative overflow-hidden bg-card border border-border/60 rounded-lg shadow-xl p-4 w-[380px] flex items-center gap-4 animate-in slide-in-from-left-full duration-500">
-          <div className="absolute top-0 left-0 w-1.5 h-full bg-primary" />
-          <div className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
-            <BellRing className="h-5 w-5" />
-          </div>
-          <div className="flex-1">
-            <div className="flex justify-between items-baseline">
-              <h3 className="font-bold text-sm text-foreground">Última Factura</h3>
-              <span className="text-xs text-muted-foreground">{timeAgo}</span>
+        <div className="relative overflow-hidden bg-card border border-border rounded-lg shadow-lg p-3 w-72 animate-in slide-in-from-left-full duration-300">
+          <div className="absolute top-0 left-0 w-1 h-full bg-primary rounded-l-lg" />
+          <div className="flex items-center gap-3 pl-2">
+            <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+              <BellRing className="h-4 w-4" />
             </div>
-            <div className="mt-1">
-              <span className="font-mono text-xs font-medium text-muted-foreground">
-                {lastInvoice.ncf}
-              </span>
-              <span className="mx-2 text-muted-foreground">•</span>
-              <span className="font-bold text-success text-sm">
-                ${formatNumber(lastInvoice.total_commission)}
-              </span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-foreground truncate">Última Factura</span>
+                <span className="text-[10px] text-muted-foreground whitespace-nowrap">{timeAgo}</span>
+              </div>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="font-mono text-[11px] text-muted-foreground truncate">
+                  {lastInvoice.ncf}
+                </span>
+                <span className="text-muted-foreground/50">•</span>
+                <span className="font-bold text-success text-xs">
+                  ${formatNumber(lastInvoice.total_commission)}
+                </span>
+              </div>
             </div>
           </div>
         </div>
-      ), { duration: 5000 });
+      ), { duration: 4000 });
       
       toastShownRef.current = true;
     }
