@@ -255,148 +255,155 @@ export const AdvancedStatistics = ({ invoices, sellerName, clients }: AdvancedSt
           </div>
         </div>
 
-        {/* Bento Grid - Main Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Bento Grid - Main Cards - Diseño mejorado */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Commission Card */}
-          <Card className="lg:col-span-1 p-6 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white relative overflow-hidden">
+          <Card className="lg:col-span-1 p-8 bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-600 text-white relative overflow-hidden shadow-xl">
             <div className="absolute top-0 right-0 opacity-10">
-              <ArrowUpRight className="h-32 w-32 -mt-8 -mr-8" />
+              <ArrowUpRight className="h-40 w-40 -mt-10 -mr-10" />
             </div>
-            <div className="flex items-center gap-2 mb-3">
-              <Wallet className="h-5 w-5 opacity-80" />
-              <span className="text-sm opacity-90 font-medium">COMISIONES DE {displayName.toUpperCase()}</span>
+            <div className="absolute bottom-0 left-0 opacity-5">
+              <DollarSign className="h-32 w-32 -mb-8 -ml-8" />
             </div>
-            <p className="text-5xl font-bold mb-3">${formatCurrency(selectedMonthStats.totalCommission)}</p>
-            <div className="flex items-center gap-2">
-              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${commissionChange >= 0 ? 'bg-white/25' : 'bg-red-400/40'}`}>
+            <div className="flex items-center gap-2 mb-4">
+              <Wallet className="h-6 w-6 opacity-90" />
+              <span className="text-sm opacity-90 font-semibold uppercase tracking-wider">Comisiones de {displayName.toUpperCase()}</span>
+            </div>
+            <p className="text-6xl font-black mb-4">${formatCurrency(selectedMonthStats.totalCommission)}</p>
+            <div className="flex items-center gap-3">
+              <span className={`px-4 py-1.5 rounded-full text-sm font-bold ${commissionChange >= 0 ? 'bg-white/30' : 'bg-red-400/50'}`}>
                 {getChangeLabel(commissionChange)}
               </span>
-              <span className="text-sm opacity-80">vs mes anterior</span>
+              <span className="text-sm opacity-80 font-medium">vs mes anterior</span>
             </div>
           </Card>
 
           {/* Sales Card */}
-          <Card className="p-5 hover-lift border-l-4 border-l-blue-500">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
-                <DollarSign className="h-5 w-5 text-blue-500" />
+          <Card className="p-6 hover-lift border-l-4 border-l-blue-500 bg-card shadow-md">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-12 w-12 rounded-xl bg-blue-500/15 flex items-center justify-center">
+                <DollarSign className="h-6 w-6 text-blue-500" />
               </div>
-              <span className="text-sm text-muted-foreground font-medium uppercase tracking-wide">Ventas Totales</span>
+              <span className="text-sm text-muted-foreground font-semibold uppercase tracking-wide">Ventas Totales</span>
             </div>
-            <p className="text-3xl font-bold text-foreground">${formatNumber(selectedMonthStats.totalSales)}</p>
+            <p className="text-4xl font-black text-foreground">${formatNumber(selectedMonthStats.totalSales)}</p>
             {salesChange !== 0 && (
-              <span className={`inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded text-xs font-medium ${salesChange >= 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+              <span className={`inline-flex items-center gap-1 mt-3 px-3 py-1 rounded-lg text-sm font-semibold ${salesChange >= 0 ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
                 {getChangeLabel(salesChange)}
               </span>
             )}
           </Card>
 
           {/* Invoices Card */}
-          <Card className="p-5 hover-lift border-l-4 border-l-purple-500">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="h-10 w-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
-                <Receipt className="h-5 w-5 text-purple-500" />
+          <Card className="p-6 hover-lift border-l-4 border-l-purple-500 bg-card shadow-md">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-12 w-12 rounded-xl bg-purple-500/15 flex items-center justify-center">
+                <Receipt className="h-6 w-6 text-purple-500" />
               </div>
-              <span className="text-sm text-muted-foreground font-medium uppercase tracking-wide">Facturas</span>
+              <span className="text-sm text-muted-foreground font-semibold uppercase tracking-wide">Facturas</span>
             </div>
-            <p className="text-3xl font-bold text-foreground">{selectedMonthStats.invoiceCount}</p>
+            <p className="text-4xl font-black text-foreground">{selectedMonthStats.invoiceCount}</p>
             {invoiceCountChange !== 0 && (
-              <span className={`inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded text-xs font-medium ${invoiceCountChange >= 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+              <span className={`inline-flex items-center gap-1 mt-3 px-3 py-1 rounded-lg text-sm font-semibold ${invoiceCountChange >= 0 ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
                 {getChangeLabel(invoiceCountChange)}
               </span>
             )}
           </Card>
         </div>
 
-        {/* Executive Summary */}
+        {/* Executive Summary - Más destacado */}
         {selectedMonthStats.invoiceCount > 0 && (
-          <Card className="p-5 bg-gradient-to-r from-muted/30 to-muted/10 border-border/50">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-amber-500 text-sm">💡</span>
-              <h3 className="font-semibold text-foreground">Resumen Ejecutivo</h3>
+          <Card className="p-6 bg-gradient-to-r from-amber-50 via-white to-amber-50 border-2 border-amber-200/50 shadow-md">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-2xl">💡</span>
+              <h3 className="font-bold text-lg text-foreground">Resumen Ejecutivo</h3>
             </div>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              {typingText}{isTyping && <span className="inline-block w-0.5 h-4 bg-primary ml-0.5 animate-pulse" />}
+            <p className="text-base text-muted-foreground leading-relaxed">
+              {typingText}{isTyping && <span className="inline-block w-0.5 h-5 bg-primary ml-0.5 animate-pulse" />}
             </p>
           </Card>
         )}
 
-        {/* Strategic + Origin */}
+        {/* Strategic + Origin - Diseño mejorado */}
         {selectedMonthStats.productBreakdown.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card className="p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                <h3 className="font-semibold text-foreground">Resumen Estratégico</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="p-6 shadow-md">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="h-10 w-10 rounded-xl bg-amber-500/15 flex items-center justify-center">
+                  <BarChart3 className="h-5 w-5 text-amber-500" />
+                </div>
+                <h3 className="font-bold text-lg text-foreground">Resumen Estratégico</h3>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {selectedMonthStats.productBreakdown[0] && (
-                  <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Trophy className="h-4 w-4 text-amber-500" />
-                      <span className="text-xs font-semibold text-amber-600 uppercase">Ganador #1</span>
+                  <div className="p-5 rounded-2xl bg-gradient-to-r from-amber-500/10 to-amber-500/5 border-2 border-amber-500/25">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Trophy className="h-5 w-5 text-amber-500" />
+                      <span className="text-xs font-bold text-amber-600 uppercase tracking-wider">🏆 Ganador #1</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-bold text-foreground">{selectedMonthStats.productBreakdown[0].name}</p>
-                        <p className="text-xs text-muted-foreground">Venta: ${formatNumber(selectedMonthStats.productBreakdown[0].totalAmount)}</p>
+                        <p className="font-bold text-lg text-foreground">{selectedMonthStats.productBreakdown[0].name}</p>
+                        <p className="text-sm text-muted-foreground">Venta: ${formatNumber(selectedMonthStats.productBreakdown[0].totalAmount)}</p>
                       </div>
-                      <p className="text-xl font-bold text-success">${formatCurrency(selectedMonthStats.productBreakdown[0].totalCommission)}</p>
+                      <p className="text-3xl font-black text-success">${formatCurrency(selectedMonthStats.productBreakdown[0].totalCommission)}</p>
                     </div>
                   </div>
                 )}
                 {selectedMonthStats.productBreakdown[1] && (
-                  <div className="p-4 rounded-xl bg-muted/50 border border-border">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Award className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-xs font-semibold text-muted-foreground uppercase">#2 Segundo Lugar</span>
+                  <div className="p-5 rounded-2xl bg-muted/50 border border-border">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Award className="h-5 w-5 text-muted-foreground" />
+                      <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">#2 Segundo Lugar</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <p className="font-bold text-foreground">{selectedMonthStats.productBreakdown[1].name}</p>
-                      <p className="text-lg font-bold text-success">${formatCurrency(selectedMonthStats.productBreakdown[1].totalCommission)}</p>
+                      <p className="font-bold text-lg text-foreground">{selectedMonthStats.productBreakdown[1].name}</p>
+                      <p className="text-2xl font-bold text-success">${formatCurrency(selectedMonthStats.productBreakdown[1].totalCommission)}</p>
                     </div>
                   </div>
                 )}
                 {selectedMonthStats.bestSale && (
-                  <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
-                    <div className="flex items-center gap-2 mb-2">
-                      <TrendingUp className="h-4 w-4 text-primary" />
-                      <span className="text-xs font-semibold text-primary uppercase">Venta Récord</span>
+                  <div className="p-5 rounded-2xl bg-primary/5 border-2 border-primary/20">
+                    <div className="flex items-center gap-2 mb-3">
+                      <TrendingUp className="h-5 w-5 text-primary" />
+                      <span className="text-xs font-bold text-primary uppercase tracking-wider">📈 Venta Récord</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-bold text-2xl text-foreground">${formatNumber(selectedMonthStats.bestSale.total_amount)}</p>
+                        <p className="font-black text-3xl text-foreground">${formatNumber(selectedMonthStats.bestSale.total_amount)}</p>
                         <p className="text-xs text-muted-foreground font-mono">{selectedMonthStats.bestSale.ncf}</p>
                       </div>
-                      <p className="text-lg font-bold text-success">${formatCurrency(selectedMonthStats.bestSale.total_commission)}</p>
+                      <p className="text-2xl font-bold text-success">${formatCurrency(selectedMonthStats.bestSale.total_commission)}</p>
                     </div>
                   </div>
                 )}
               </div>
             </Card>
 
-            <Card className="p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <h3 className="font-semibold text-foreground">Origen de los ingresos</h3>
+            <Card className="p-6 shadow-md">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="h-10 w-10 rounded-xl bg-blue-500/15 flex items-center justify-center">
+                  <Calendar className="h-5 w-5 text-blue-500" />
+                </div>
+                <h3 className="font-bold text-lg text-foreground">Origen de los ingresos</h3>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {selectedMonthStats.productBreakdown.slice(0, 4).map((product, index) => {
                   const percentage = totalCommission > 0 ? (product.totalCommission / totalCommission) * 100 : 0;
                   const colors = ['bg-blue-500', 'bg-emerald-500', 'bg-purple-500', 'bg-amber-500'];
                   return (
-                    <div key={product.name} className="space-y-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className={`h-5 w-5 rounded flex items-center justify-center text-[10px] font-bold text-white ${colors[index]}`}>{index + 1}</span>
-                          <span className="font-medium text-foreground">{product.name}</span>
+                    <div key={product.name} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <span className={`h-7 w-7 rounded-lg flex items-center justify-center text-xs font-bold text-white ${colors[index]}`}>{index + 1}</span>
+                          <span className="font-semibold text-foreground">{product.name}</span>
                         </div>
                         <div className="text-right">
-                          <span className="font-bold text-success">${formatCurrency(product.totalCommission)}</span>
-                          <span className="text-muted-foreground ml-2 text-xs">{percentage.toFixed(1)}%</span>
+                          <span className="font-bold text-lg text-success">${formatCurrency(product.totalCommission)}</span>
+                          <span className="text-muted-foreground ml-2 text-sm">{percentage.toFixed(1)}%</span>
                         </div>
                       </div>
-                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div className="h-3 bg-muted rounded-full overflow-hidden">
                         <div className={`h-full ${colors[index]} transition-all duration-500`} style={{ width: `${percentage}%` }} />
                       </div>
                     </div>
@@ -407,25 +414,27 @@ export const AdvancedStatistics = ({ invoices, sellerName, clients }: AdvancedSt
           </div>
         )}
 
-        {/* Daily Activity */}
+        {/* Daily Activity - Mejorado */}
         {selectedMonthStats.invoiceCount > 0 && (
-          <Card className="p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-primary" />
-                <h3 className="font-semibold text-foreground">Actividad Diaria</h3>
+          <Card className="p-6 shadow-md">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-primary/15 flex items-center justify-center">
+                  <BarChart3 className="h-5 w-5 text-primary" />
+                </div>
+                <h3 className="font-bold text-lg text-foreground">Actividad Diaria</h3>
               </div>
               {selectedMonthStats.bestDay && selectedMonthStats.bestDay.commission > 0 && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                  <Trophy className="h-4 w-4 text-amber-500" />
-                  <span className="text-sm font-medium text-amber-600">
-                    El mejor día fue el {selectedMonthStats.bestDay.day} de {format(selectedDate, 'MMMM', { locale: es })}.
+                <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500/15 to-amber-500/5 border border-amber-500/25">
+                  <Trophy className="h-5 w-5 text-amber-500" />
+                  <span className="text-sm font-semibold text-amber-600">
+                    🔥 Mejor día: {selectedMonthStats.bestDay.day} de {format(selectedDate, 'MMMM', { locale: es })}
                   </span>
                 </div>
               )}
             </div>
-            <p className="text-sm text-muted-foreground mb-4">Clic en una barra para ver detalle.</p>
-            <div className="flex items-end gap-0.5 h-32 mt-4">
+            <p className="text-sm text-muted-foreground mb-5">Pasa el cursor sobre una barra para ver el detalle de ese día.</p>
+            <div className="flex items-end gap-1 h-40 mt-4">
               {selectedMonthStats.dailyData.map((day) => {
                 const heightPercentage = maxDailyCommission > 0 ? (day.commission / maxDailyCommission) * 100 : 0;
                 const isBestDay = selectedMonthStats.bestDay?.day === day.day;
@@ -433,23 +442,25 @@ export const AdvancedStatistics = ({ invoices, sellerName, clients }: AdvancedSt
                   <Tooltip key={day.day}>
                     <TooltipTrigger asChild>
                       <div 
-                        className={`flex-1 rounded-t cursor-pointer transition-all duration-200 hover:opacity-80 ${day.invoiceCount > 0 ? (isBestDay ? 'bg-emerald-500' : 'bg-blue-500') : 'bg-muted'}`}
-                        style={{ height: `${Math.max(heightPercentage, day.invoiceCount > 0 ? 8 : 2)}%`, minHeight: day.invoiceCount > 0 ? '8px' : '2px' }}
+                        className={`flex-1 rounded-t-md cursor-pointer transition-all duration-200 hover:opacity-80 ${day.invoiceCount > 0 ? (isBestDay ? 'bg-gradient-to-t from-emerald-600 to-emerald-400' : 'bg-gradient-to-t from-blue-600 to-blue-400') : 'bg-muted'}`}
+                        style={{ height: `${Math.max(heightPercentage, day.invoiceCount > 0 ? 8 : 2)}%`, minHeight: day.invoiceCount > 0 ? '10px' : '3px' }}
                       />
                     </TooltipTrigger>
-                    <TooltipContent className="p-3">
-                      <p className="font-semibold mb-1">{format(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day.day), "EEEE d 'de' MMMM", { locale: es })}</p>
-                      <p>Ventas: <span className="font-semibold">${formatNumber(day.sales)}</span></p>
-                      <p className="text-success">Comisión: <span className="font-semibold">${formatCurrency(day.commission)}</span></p>
-                      <p>Facturas: <span className="font-semibold">{day.invoiceCount}</span></p>
+                    <TooltipContent className="p-4 bg-card border-border shadow-xl">
+                      <p className="font-bold text-base mb-2">{format(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day.day), "EEEE d 'de' MMMM", { locale: es })}</p>
+                      <div className="space-y-1 text-sm">
+                        <p>Ventas: <span className="font-bold">${formatNumber(day.sales)}</span></p>
+                        <p className="text-success">Comisión: <span className="font-bold">${formatCurrency(day.commission)}</span></p>
+                        <p>Facturas: <span className="font-bold">{day.invoiceCount}</span></p>
+                      </div>
                     </TooltipContent>
                   </Tooltip>
                 );
               })}
             </div>
-            <div className="flex gap-0.5 mt-2">
+            <div className="flex gap-1 mt-3">
               {selectedMonthStats.dailyData.map((day) => (
-                <div key={day.day} className="flex-1 text-center text-[9px] text-muted-foreground">{day.day % 5 === 1 || day.day === 1 ? day.day : ''}</div>
+                <div key={day.day} className="flex-1 text-center text-xs text-muted-foreground font-medium">{day.day % 5 === 1 || day.day === 1 ? day.day : ''}</div>
               ))}
             </div>
           </Card>
