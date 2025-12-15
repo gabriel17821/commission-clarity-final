@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Pencil, CalendarIcon, Save, Trash2, Plus, X } from 'lucide-react';
+import { Pencil, CalendarIcon, Save, Trash2, Plus, X, User, UserPlus } from 'lucide-react';
 import { formatNumber } from '@/lib/formatters';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -12,9 +12,12 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Invoice } from '@/hooks/useInvoices';
 import { Product, useProducts } from '@/hooks/useProducts';
+import { Client } from '@/hooks/useClients';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface EditInvoiceDialogProps {
   invoice: Invoice;
+  clients?: Client[];
   onUpdate: (
     id: string,
     ncf: string,
@@ -24,7 +27,8 @@ interface EditInvoiceDialogProps {
     restPercentage: number,
     restCommission: number,
     totalCommission: number,
-    products: { name: string; amount: number; percentage: number; commission: number }[]
+    products: { name: string; amount: number; percentage: number; commission: number }[],
+    clientId?: string | null
   ) => Promise<any>;
   onDelete: (id: string) => Promise<boolean>;
   trigger?: React.ReactNode;
@@ -38,7 +42,7 @@ const parseInvoiceDate = (dateString: string): Date => {
   return new Date(dateString);
 };
 
-export const EditInvoiceDialog = ({ invoice, onUpdate, onDelete, trigger }: EditInvoiceDialogProps) => {
+export const EditInvoiceDialog = ({ invoice, clients, onUpdate, onDelete, trigger }: EditInvoiceDialogProps) => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -48,6 +52,7 @@ export const EditInvoiceDialog = ({ invoice, onUpdate, onDelete, trigger }: Edit
   const [totalAmount, setTotalAmount] = useState(0);
   const [products, setProducts] = useState<{ name: string; amount: number; percentage: number; commission: number }[]>([]);
   const [restPercentage, setRestPercentage] = useState(25);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   
   // For adding new products
   const [showAddProduct, setShowAddProduct] = useState(false);
@@ -68,6 +73,7 @@ export const EditInvoiceDialog = ({ invoice, onUpdate, onDelete, trigger }: Edit
       setInvoiceDate(parseInvoiceDate(invoice.invoice_date || invoice.created_at));
       setTotalAmount(invoice.total_amount);
       setRestPercentage(invoice.rest_percentage || 25);
+      setSelectedClientId((invoice as any).client_id || null);
       
       // Load products
       const prods = invoice.products?.map(p => ({
@@ -160,7 +166,8 @@ export const EditInvoiceDialog = ({ invoice, onUpdate, onDelete, trigger }: Edit
       restPercentage,
       restCommission,
       totalCommission,
-      products
+      products,
+      selectedClientId
     );
     
     setLoading(false);
@@ -168,6 +175,8 @@ export const EditInvoiceDialog = ({ invoice, onUpdate, onDelete, trigger }: Edit
       setOpen(false);
     }
   };
+
+  const selectedClient = clients?.find(c => c.id === selectedClientId);
 
   const handleDelete = async () => {
     if (!deleteConfirm) {
@@ -210,6 +219,53 @@ export const EditInvoiceDialog = ({ invoice, onUpdate, onDelete, trigger }: Edit
           <DialogTitle className="text-xl">Editar Factura</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Client Selector */}
+          <div className="space-y-2">
+            <Label className="text-base flex items-center gap-2">
+              <User className="h-4 w-4 text-primary" />
+              Cliente
+            </Label>
+            {clients && clients.length > 0 ? (
+              <Select 
+                value={selectedClientId || 'none'} 
+                onValueChange={(value) => setSelectedClientId(value === 'none' ? null : value)}
+              >
+                <SelectTrigger className="h-12">
+                  <SelectValue placeholder="Seleccionar cliente (opcional)">
+                    {selectedClient ? (
+                      <span className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-primary" />
+                        {selectedClient.name}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">Sin cliente asignado</span>
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">
+                    <span className="text-muted-foreground">Sin cliente</span>
+                  </SelectItem>
+                  {clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      <span className="flex items-center gap-2">
+                        <User className="h-3.5 w-3.5" />
+                        {client.name}
+                        {client.phone && (
+                          <span className="text-xs text-muted-foreground">({client.phone})</span>
+                        )}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="p-3 rounded-lg bg-muted/50 border border-dashed border-border text-sm text-muted-foreground text-center">
+                No hay clientes disponibles
+              </div>
+            )}
+          </div>
+
           {/* Date Picker */}
           <div className="space-y-2">
             <Label className="text-base">Fecha de la Factura</Label>

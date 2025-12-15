@@ -321,18 +321,18 @@ export const MonthlyBreakdown = ({ invoices, clients, onUpdateInvoice, onDeleteI
       ) : (
         <>
           {/* Product Cards Grid - 2 per row on desktop */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {productsBreakdown.map((product, index) => (
               <Card 
                 key={product.name} 
-                className="overflow-hidden bg-card border border-border/60 shadow-sm hover:shadow-md transition-all duration-300 animate-fade-in flex flex-col"
+                className="overflow-hidden bg-card border border-border/60 shadow-md hover:shadow-lg transition-all duration-300 animate-fade-in flex flex-col"
                 style={{ animationDelay: `${index * 80}ms` }}
               >
                 {/* Product Header */}
-                <div className="px-4 py-3 bg-muted/30 border-b border-border/50">
+                <div className="px-5 py-4 bg-gradient-to-r from-muted/50 to-muted/20 border-b border-border/50">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-base text-foreground">{product.name}</h3>
+                    <div className="flex items-center gap-3">
+                      <h3 className="font-bold text-lg text-foreground">{product.name}</h3>
                       <EditGlobalPercentageDialog
                         productName={product.name}
                         currentPercentage={product.percentage}
@@ -341,46 +341,47 @@ export const MonthlyBreakdown = ({ invoices, clients, onUpdateInvoice, onDeleteI
                         onUpdate={(newPercentage) => handleUpdateGlobalPercentage(product.name, newPercentage)}
                       />
                     </div>
-                    <span className="px-2.5 py-1 rounded-lg bg-primary/10 text-primary text-sm font-bold">
+                    <span className="px-3 py-1.5 rounded-xl bg-primary/15 text-primary text-base font-bold">
                       {product.percentage}%
                     </span>
                   </div>
                 </div>
                 
-                <div className="p-4 flex-1 flex flex-col">
+                <div className="p-5 flex-1 flex flex-col">
                   {/* Entries Table */}
-                  <div className="space-y-1.5 mb-3 max-h-36 overflow-y-auto flex-1">
+                  <div className="space-y-2 mb-4 max-h-44 overflow-y-auto flex-1">
                     {product.entries.map((entry, i) => (
                       <div 
                         key={i} 
-                        className="flex items-center justify-between text-sm py-2 px-2.5 rounded-lg bg-muted/40 hover:bg-muted/60 transition-colors"
+                        className="flex items-center justify-between text-sm py-3 px-3 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors"
                       >
-                        <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                        <div className="flex flex-col gap-1 min-w-0 flex-1">
                           {entry.clientName && (
-                            <span className="text-foreground font-medium text-xs flex items-center gap-1 truncate">
-                              <User className="h-3 w-3 text-primary shrink-0" />
+                            <span className="text-foreground font-semibold text-sm flex items-center gap-1.5 truncate">
+                              <User className="h-3.5 w-3.5 text-primary shrink-0" />
                               {entry.clientName}
                             </span>
                           )}
-                          <span className="text-muted-foreground font-mono text-[10px]">
+                          <span className="text-muted-foreground font-mono text-xs">
                             {entry.ncf}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-muted-foreground text-xs">
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="text-muted-foreground text-sm">
                             {format(parseDateSafe(entry.date), 'd MMM', { locale: es })}
                           </span>
-                          <span className="font-semibold text-foreground text-sm">
+                          <span className="font-bold text-foreground text-base">
                             ${formatNumber(entry.amount)}
                           </span>
                           {onUpdateInvoice && onDeleteInvoice && (
                             <EditInvoiceDialog
                               invoice={filteredInvoices.find(inv => inv.ncf === entry.ncf)!}
+                              clients={clients}
                               onUpdate={onUpdateInvoice}
                               onDelete={onDeleteInvoice}
                               trigger={
-                                <Button variant="ghost" size="icon" className="h-5 w-5 text-muted-foreground hover:text-primary">
-                                  <Pencil className="h-2.5 w-2.5" />
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary">
+                                  <Pencil className="h-3.5 w-3.5" />
                                 </Button>
                               }
                             />
@@ -390,20 +391,20 @@ export const MonthlyBreakdown = ({ invoices, clients, onUpdateInvoice, onDeleteI
                     ))}
                   </div>
                   
-                  {/* Línea divisoria */}
-                  <div className="border-t border-dashed border-border my-2" />
+                  {/* Línea divisoria elegante */}
+                  <div className="border-t-2 border-dashed border-border/70 my-4" />
                   
-                  {/* Summary Row */}
-                  <div className="flex items-center justify-between gap-3">
+                  {/* Summary Row - Más grande y visible */}
+                  <div className="flex items-center justify-between gap-4">
                     <div>
-                      <span className="text-xs text-muted-foreground">Subtotal</span>
-                      <p className="font-bold text-base text-foreground">${formatNumber(product.totalAmount)}</p>
+                      <span className="text-sm text-muted-foreground font-medium">Subtotal</span>
+                      <p className="font-bold text-xl text-foreground">${formatNumber(product.totalAmount)}</p>
                     </div>
                     
-                    {/* Comisión */}
-                    <div className="px-3 py-2 rounded-lg bg-success/10 border border-success/20 text-right">
-                      <span className="text-[10px] text-success font-medium">Comisión ({product.percentage}%)</span>
-                      <p className="font-bold text-lg text-success">${formatCurrency(product.totalCommission)}</p>
+                    {/* Comisión destacada */}
+                    <div className="px-5 py-3 rounded-xl bg-success/15 border-2 border-success/30 text-right">
+                      <span className="text-xs text-success font-semibold uppercase tracking-wide">Comisión ({product.percentage}%)</span>
+                      <p className="font-bold text-2xl text-success">${formatCurrency(product.totalCommission)}</p>
                     </div>
                   </div>
                 </div>
@@ -413,53 +414,54 @@ export const MonthlyBreakdown = ({ invoices, clients, onUpdateInvoice, onDeleteI
             {/* Resto de Productos Card */}
             {restBreakdown.totalAmount > 0 && (
               <Card 
-                className="overflow-hidden bg-card border border-border/60 shadow-sm hover:shadow-md transition-all duration-300 animate-fade-in flex flex-col"
+                className="overflow-hidden bg-card border border-border/60 shadow-md hover:shadow-lg transition-all duration-300 animate-fade-in flex flex-col"
                 style={{ animationDelay: `${productsBreakdown.length * 80}ms` }}
               >
                 {/* Header */}
-                <div className="px-4 py-3 bg-secondary/20 border-b border-border/50">
+                <div className="px-5 py-4 bg-gradient-to-r from-secondary/30 to-secondary/10 border-b border-border/50">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-base text-foreground">Resto de Productos</h3>
-                    <span className="px-2.5 py-1 rounded-lg bg-secondary/30 text-secondary-foreground text-sm font-bold">
+                    <h3 className="font-bold text-lg text-foreground">Resto de Productos</h3>
+                    <span className="px-3 py-1.5 rounded-xl bg-secondary/40 text-secondary-foreground text-base font-bold">
                       25%
                     </span>
                   </div>
                 </div>
                 
-                <div className="p-4 flex-1 flex flex-col">
+                <div className="p-5 flex-1 flex flex-col">
                   {/* Entries */}
-                  <div className="space-y-1.5 mb-3 max-h-36 overflow-y-auto flex-1">
+                  <div className="space-y-2 mb-4 max-h-44 overflow-y-auto flex-1">
                     {restBreakdown.entries.map((entry, i) => (
                       <div 
                         key={i} 
-                        className="flex items-center justify-between text-sm py-2 px-2.5 rounded-lg bg-muted/40 hover:bg-muted/60 transition-colors"
+                        className="flex items-center justify-between text-sm py-3 px-3 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors"
                       >
-                        <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                        <div className="flex flex-col gap-1 min-w-0 flex-1">
                           {entry.clientName && (
-                            <span className="text-foreground font-medium text-xs flex items-center gap-1 truncate">
-                              <User className="h-3 w-3 text-primary shrink-0" />
+                            <span className="text-foreground font-semibold text-sm flex items-center gap-1.5 truncate">
+                              <User className="h-3.5 w-3.5 text-primary shrink-0" />
                               {entry.clientName}
                             </span>
                           )}
-                          <span className="text-muted-foreground font-mono text-[10px]">
+                          <span className="text-muted-foreground font-mono text-xs">
                             {entry.ncf}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-muted-foreground text-xs">
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="text-muted-foreground text-sm">
                             {format(parseDateSafe(entry.date), 'd MMM', { locale: es })}
                           </span>
-                          <span className="font-semibold text-foreground text-sm">
+                          <span className="font-bold text-foreground text-base">
                             ${formatNumber(entry.amount)}
                           </span>
                           {onUpdateInvoice && onDeleteInvoice && (
                             <EditInvoiceDialog
                               invoice={filteredInvoices.find(inv => inv.ncf === entry.ncf)!}
+                              clients={clients}
                               onUpdate={onUpdateInvoice}
                               onDelete={onDeleteInvoice}
                               trigger={
-                                <Button variant="ghost" size="icon" className="h-5 w-5 text-muted-foreground hover:text-primary">
-                                  <Pencil className="h-2.5 w-2.5" />
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary">
+                                  <Pencil className="h-3.5 w-3.5" />
                                 </Button>
                               }
                             />
@@ -469,19 +471,19 @@ export const MonthlyBreakdown = ({ invoices, clients, onUpdateInvoice, onDeleteI
                     ))}
                   </div>
                   
-                  {/* Línea divisoria */}
-                  <div className="border-t border-dashed border-border my-2" />
+                  {/* Línea divisoria elegante */}
+                  <div className="border-t-2 border-dashed border-border/70 my-4" />
                   
-                  {/* Summary */}
-                  <div className="flex items-center justify-between gap-3">
+                  {/* Summary - Más grande y visible */}
+                  <div className="flex items-center justify-between gap-4">
                     <div>
-                      <span className="text-xs text-muted-foreground">Subtotal</span>
-                      <p className="font-bold text-base text-foreground">${formatNumber(restBreakdown.totalAmount)}</p>
+                      <span className="text-sm text-muted-foreground font-medium">Subtotal</span>
+                      <p className="font-bold text-xl text-foreground">${formatNumber(restBreakdown.totalAmount)}</p>
                     </div>
                     
-                    <div className="px-3 py-2 rounded-lg bg-success/10 border border-success/20 text-right">
-                      <span className="text-[10px] text-success font-medium">Comisión (25%)</span>
-                      <p className="font-bold text-lg text-success">${formatCurrency(restBreakdown.totalCommission)}</p>
+                    <div className="px-5 py-3 rounded-xl bg-success/15 border-2 border-success/30 text-right">
+                      <span className="text-xs text-success font-semibold uppercase tracking-wide">Comisión (25%)</span>
+                      <p className="font-bold text-2xl text-success">${formatCurrency(restBreakdown.totalCommission)}</p>
                     </div>
                   </div>
                 </div>
@@ -489,18 +491,18 @@ export const MonthlyBreakdown = ({ invoices, clients, onUpdateInvoice, onDeleteI
             )}
           </div>
 
-          {/* Elegant Commission Summary Box */}
-          <Card className="p-8 bg-gradient-to-b from-slate-50 to-white border-border/50 shadow-sm">
-            {/* Products Row with + signs */}
-            <div className="flex flex-wrap items-center justify-center gap-3 mb-6">
+          {/* Elegant Commission Summary Box - Mejorado */}
+          <Card className="p-10 bg-gradient-to-b from-slate-50 via-white to-slate-50 border-2 border-border/60 shadow-lg">
+            {/* Products Row with + signs - Más grande */}
+            <div className="flex flex-wrap items-center justify-center gap-4 mb-8">
               {productsBreakdown.map((product, index) => (
-                <div key={product.name} className="flex items-center gap-3">
-                  <div className="px-4 py-3 rounded-lg border border-border/60 bg-white shadow-sm text-center min-w-[100px]">
-                    <p className="text-[10px] text-muted-foreground uppercase font-medium tracking-wide">{product.name}</p>
-                    <p className="text-lg font-bold text-foreground">${formatCurrency(product.totalCommission)}</p>
+                <div key={product.name} className="flex items-center gap-4">
+                  <div className="px-6 py-4 rounded-xl border-2 border-border/70 bg-white shadow-sm text-center min-w-[130px]">
+                    <p className="text-xs text-muted-foreground uppercase font-semibold tracking-wide mb-1">{product.name}</p>
+                    <p className="text-2xl font-bold text-foreground">${formatCurrency(product.totalCommission)}</p>
                   </div>
                   {index < productsBreakdown.length - 1 && (
-                    <span className="text-xl text-muted-foreground font-light">+</span>
+                    <span className="text-3xl text-muted-foreground font-light">+</span>
                   )}
                 </div>
               ))}
@@ -509,29 +511,29 @@ export const MonthlyBreakdown = ({ invoices, clients, onUpdateInvoice, onDeleteI
               {restBreakdown.totalAmount > 0 && (
                 <>
                   {productsBreakdown.length > 0 && (
-                    <span className="text-xl text-muted-foreground font-light">+</span>
+                    <span className="text-3xl text-muted-foreground font-light">+</span>
                   )}
-                  <div className="px-4 py-3 rounded-lg border border-border/60 bg-white shadow-sm text-center min-w-[100px]">
-                    <p className="text-[10px] text-muted-foreground uppercase font-medium tracking-wide">Resto (25%)</p>
-                    <p className="text-lg font-bold text-foreground">${formatCurrency(restBreakdown.totalCommission)}</p>
+                  <div className="px-6 py-4 rounded-xl border-2 border-border/70 bg-white shadow-sm text-center min-w-[130px]">
+                    <p className="text-xs text-muted-foreground uppercase font-semibold tracking-wide mb-1">Resto (25%)</p>
+                    <p className="text-2xl font-bold text-foreground">${formatCurrency(restBreakdown.totalCommission)}</p>
                   </div>
                 </>
               )}
             </div>
             
-            {/* Separator Line with = */}
-            <div className="flex items-center justify-center gap-4 my-6">
-              <div className="flex-1 h-px bg-border" />
-              <span className="text-xl text-muted-foreground font-light">=</span>
-              <div className="flex-1 h-px bg-border" />
+            {/* Separator Line with = - Más visible */}
+            <div className="flex items-center justify-center gap-6 my-8">
+              <div className="flex-1 h-0.5 bg-gradient-to-r from-transparent via-border to-transparent" />
+              <span className="text-3xl text-muted-foreground font-light">=</span>
+              <div className="flex-1 h-0.5 bg-gradient-to-r from-transparent via-border to-transparent" />
             </div>
             
-            {/* Grand Total */}
+            {/* Grand Total - Mucho más grande */}
             <div className="text-center">
-              <p className="text-sm text-muted-foreground uppercase tracking-widest mb-2">
+              <p className="text-base text-muted-foreground uppercase tracking-widest mb-3 font-medium">
                 Comisión Total — {capitalizedMonth}
               </p>
-              <p className="text-5xl font-bold text-success">${formatCurrency(grandTotalCommission)}</p>
+              <p className="text-6xl font-black text-success">${formatCurrency(grandTotalCommission)}</p>
             </div>
           </Card>
         </>

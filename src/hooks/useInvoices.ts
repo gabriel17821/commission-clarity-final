@@ -155,7 +155,8 @@ const deleteInvoice = async (id: string) => {
     restPercentage: number,
     restCommission: number,
     totalCommission: number,
-    products: { name: string; amount: number; percentage: number; commission: number }[]
+    products: { name: string; amount: number; percentage: number; commission: number }[],
+    clientId?: string | null
   ) => {
     // Check if NCF already exists (excluding current invoice)
     const { data: existing } = await supabase
@@ -180,6 +181,7 @@ const deleteInvoice = async (id: string) => {
         rest_percentage: restPercentage,
         rest_commission: restCommission,
         total_commission: totalCommission,
+        client_id: clientId,
       })
       .eq('id', id)
       .select()
