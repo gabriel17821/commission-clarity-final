@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { RotateCcw, Calculator, DollarSign, Check, Package, CalendarIcon, FileText, CheckCircle2, User, Save, CloudOff } from "lucide-react";
+import { RotateCcw, Calculator, DollarSign, Check, Package, CalendarIcon, FileText, CheckCircle2, User, Save, CloudOff, RefreshCw } from "lucide-react";
 import { EditRestPercentageDialog } from "@/components/EditRestPercentageDialog";
 import { BreakdownTable } from "@/components/BreakdownTable";
 import { ProductManager } from "@/components/ProductManager";
@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { Invoice } from "@/hooks/useInvoices";
 import { Client } from "@/hooks/useClients";
 import { Seller } from "@/hooks/useSellers";
+import { useDraftPersistence } from "@/hooks/useDraftPersistence";
 
 interface Product {
   id: string;
@@ -111,11 +112,105 @@ export const CalculatorView = ({
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const toastShownRef = useRef(false);
+  const draftRecoveryShownRef = useRef(false);
 
   const ncfPrefix = 'B010000';
   
+  // Draft persistence
+  const { 
+    recoveredDraft, 
+    showRecoveryPrompt, 
+    saveDraft, 
+    clearDraft, 
+    dismissRecoveryPrompt, 
+    acceptRecovery 
+  } = useDraftPersistence();
+
   // Detect if there's unsaved draft work
   const hasDraft = step1Complete || step2Complete || totalInvoice > 0;
+
+  // Show recovery notification
+  useEffect(() => {
+    if (showRecoveryPrompt && recoveredDraft && !draftRecoveryShownRef.current) {
+      draftRecoveryShownRef.current = true;
+      
+      toast.custom((t) => (
+        <div className="relative overflow-hidden bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/50 dark:to-orange-950/50 border border-amber-200 dark:border-amber-800 rounded-xl shadow-xl px-5 py-4 w-[420px] max-w-[calc(100vw-2rem)] animate-in slide-in-from-top-full duration-500">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 to-orange-500" />
+          
+          <div className="flex items-center gap-4">
+            <div className="h-10 w-10 rounded-lg bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center flex-shrink-0">
+              <RefreshCw className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            </div>
+            
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-amber-900 dark:text-amber-100">Recuperar borrador</p>
+              <p className="text-sm text-amber-700 dark:text-amber-300">Tienes una factura sin guardar</p>
+            </div>
+            
+            <div className="flex gap-2 flex-shrink-0">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  clearDraft();
+                  toast.dismiss(t);
+                }}
+                className="text-amber-700 hover:text-amber-900 hover:bg-amber-100"
+              >
+                Descartar
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  const draft = acceptRecovery();
+                  if (draft) {
+                    // Restore draft data
+                    setNcfSuffix(draft.ncfSuffix);
+                    setInvoiceDate(new Date(draft.invoiceDate));
+                    setTotalInvoice(draft.totalInvoice);
+                    setDisplayValue(draft.totalInvoice > 0 ? formatNumber(draft.totalInvoice) : '');
+                    setStep1Complete(draft.step1Complete);
+                    setStep2Complete(draft.step2Complete);
+                    
+                    // Restore product amounts
+                    Object.entries(draft.productAmounts).forEach(([id, amount]) => {
+                      onProductChange(id, amount);
+                    });
+                    
+                    // Restore client
+                    if (draft.selectedClientId) {
+                      const client = clients.find(c => c.id === draft.selectedClientId);
+                      if (client) setSelectedClient(client);
+                    }
+                  }
+                  toast.dismiss(t);
+                }}
+                className="bg-amber-500 hover:bg-amber-600 text-white"
+              >
+                Recuperar
+              </Button>
+            </div>
+          </div>
+        </div>
+      ), { duration: 15000, id: 'draft-recovery' });
+    }
+  }, [showRecoveryPrompt, recoveredDraft, acceptRecovery, clearDraft, clients, onProductChange, setTotalInvoice]);
+
+  // Auto-save draft when data changes
+  useEffect(() => {
+    if (hasDraft) {
+      saveDraft({
+        ncfSuffix,
+        invoiceDate: invoiceDate.toISOString(),
+        selectedClientId: selectedClient?.id || null,
+        totalInvoice,
+        productAmounts,
+        step1Complete,
+        step2Complete,
+      });
+    }
+  }, [ncfSuffix, invoiceDate, selectedClient, totalInvoice, productAmounts, step1Complete, step2Complete, hasDraft, saveDraft]);
 
   useEffect(() => {
     if (suggestedNcf !== null && suggestedNcf !== undefined) {
@@ -123,53 +218,55 @@ export const CalculatorView = ({
     }
   }, [suggestedNcf]);
 
-  // Notificación de Última Factura - elegante y moderna
+  // Notificación de Última Factura - diseño horizontal y moderno
   useEffect(() => {
     if (lastInvoice && !toastShownRef.current) {
       const date = parseDateSafe(lastInvoice.created_at);
+      const timeStr = format(date, "h:mm a", { locale: es });
       let timeAgo = isToday(date) 
-        ? 'Hoy' 
-        : (isYesterday(date) ? 'Ayer' : format(date, 'd MMM', { locale: es }));
+        ? `hoy a las ${timeStr}` 
+        : (isYesterday(date) ? `ayer a las ${timeStr}` : format(date, "d MMM 'a las' h:mm a", { locale: es }));
+      
+      // Get client name if available
+      const clientName = (lastInvoice as any).clients?.name || 'Sin cliente';
       
       toast.custom((t) => (
-        <div className="relative overflow-hidden bg-gradient-to-br from-card to-card/95 border border-border/60 rounded-2xl shadow-2xl p-4 w-80 animate-in slide-in-from-right-full duration-500">
-          {/* Gradient accent bar */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-primary/80 to-success rounded-t-2xl" />
+        <div className="relative overflow-hidden bg-gradient-to-r from-card via-card to-card/95 border border-border/50 rounded-xl shadow-2xl px-5 py-3.5 w-[480px] max-w-[calc(100vw-2rem)] animate-in slide-in-from-top-full duration-500">
+          {/* Top accent line */}
+          <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary via-success to-primary/50" />
           
-          <div className="flex items-start gap-4 pt-1">
-            {/* Icon container */}
-            <div className="relative">
-              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shadow-inner">
-                <FileText className="h-6 w-6 text-primary" />
-              </div>
-              <div className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-success flex items-center justify-center ring-2 ring-card">
-                <Check className="h-2.5 w-2.5 text-success-foreground" />
-              </div>
+          <div className="flex items-center gap-4">
+            {/* Icon */}
+            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-primary/15 to-success/10 flex items-center justify-center flex-shrink-0">
+              <FileText className="h-5 w-5 text-primary" />
             </div>
             
-            {/* Content */}
-            <div className="flex-1 min-w-0 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-foreground">Última Factura</span>
-                <span className="text-[11px] font-medium text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full">{timeAgo}</span>
+            {/* Main content - horizontal layout */}
+            <div className="flex-1 flex items-center justify-between gap-4 min-w-0">
+              <div className="flex flex-col min-w-0">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Última Factura</span>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="font-semibold text-foreground truncate">{clientName}</span>
+                  <span className="text-xs text-muted-foreground">•</span>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">{timeAgo}</span>
+                </div>
               </div>
               
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-sm font-semibold text-foreground bg-muted/40 px-2 py-1 rounded-md">
-                  {lastInvoice.ncf}
-                </span>
-              </div>
-              
-              <div className="flex items-center justify-between pt-1 border-t border-border/40">
-                <span className="text-xs text-muted-foreground">Comisión generada</span>
-                <span className="text-lg font-black text-success">
-                  ${formatCurrency(lastInvoice.total_commission)}
-                </span>
+              {/* Amount and Commission */}
+              <div className="flex items-center gap-4 flex-shrink-0">
+                <div className="text-right">
+                  <span className="text-xs text-muted-foreground">Monto</span>
+                  <p className="font-semibold text-foreground">${formatNumber(lastInvoice.total_amount)}</p>
+                </div>
+                <div className="text-right pl-4 border-l border-border/50">
+                  <span className="text-xs text-muted-foreground">Comisión</span>
+                  <p className="font-bold text-success text-lg">${formatCurrency(lastInvoice.total_commission)}</p>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      ), { duration: 5000 });
+      ), { duration: 6000 });
       
       toastShownRef.current = true;
     }
@@ -203,8 +300,9 @@ export const CalculatorView = ({
     setStep1Complete(false);
     setStep2Complete(false);
     onReset();
+    clearDraft();
     toastShownRef.current = false;
-  }, [onReset]);
+  }, [onReset, clearDraft]);
 
   const handleNcfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, '').slice(0, 4);
@@ -229,6 +327,7 @@ export const CalculatorView = ({
     setShowSaveAnimation(true);
     const fullNcf = `${ncfPrefix}${ncfSuffix.padStart(4, '0')}`;
     await onSaveInvoice(fullNcf, format(invoiceDate, 'yyyy-MM-dd'), selectedClient?.id);
+    clearDraft();
     setIsSaving(false);
   };
 
@@ -502,7 +601,7 @@ export const CalculatorView = ({
                 disabled={totalInvoice === 0} 
                 onClick={handleOpenPreview}
               >
-                <FileText className="h-5 w-5" /> Vista Previa
+                <FileText className="h-5 w-5" /> Guardar Factura
               </Button>
               <Button variant="outline" onClick={handleReset} className="gap-2 h-11 flex-1">
                 <RotateCcw className="h-4 w-4" /> Limpiar
