@@ -489,19 +489,49 @@ export const MonthlyBreakdown = ({ invoices, clients, onUpdateInvoice, onDeleteI
             )}
           </div>
 
-          {/* Grand Total */}
-          <Card className="p-6 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border-primary/20 hover-lift">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Total Comisiones del Mes</p>
-                <p className="text-sm text-muted-foreground">
-                  {productsBreakdown.length} productos con comisiones variables + resto al 25% · {filteredInvoices.length} facturas
-                </p>
-              </div>
-              <div className="text-right">
-                <span className="text-sm font-medium text-muted-foreground">{capitalizedMonth}</span>
-                <p className="text-4xl font-bold text-success">${formatCurrency(grandTotalCommission)}</p>
-              </div>
+          {/* Elegant Commission Summary Box */}
+          <Card className="p-8 bg-gradient-to-b from-slate-50 to-white border-border/50 shadow-sm">
+            {/* Products Row with + signs */}
+            <div className="flex flex-wrap items-center justify-center gap-3 mb-6">
+              {productsBreakdown.map((product, index) => (
+                <div key={product.name} className="flex items-center gap-3">
+                  <div className="px-4 py-3 rounded-lg border border-border/60 bg-white shadow-sm text-center min-w-[100px]">
+                    <p className="text-[10px] text-muted-foreground uppercase font-medium tracking-wide">{product.name}</p>
+                    <p className="text-lg font-bold text-foreground">${formatCurrency(product.totalCommission)}</p>
+                  </div>
+                  {index < productsBreakdown.length - 1 && (
+                    <span className="text-xl text-muted-foreground font-light">+</span>
+                  )}
+                </div>
+              ))}
+              
+              {/* Rest box */}
+              {restBreakdown.totalAmount > 0 && (
+                <>
+                  {productsBreakdown.length > 0 && (
+                    <span className="text-xl text-muted-foreground font-light">+</span>
+                  )}
+                  <div className="px-4 py-3 rounded-lg border border-border/60 bg-white shadow-sm text-center min-w-[100px]">
+                    <p className="text-[10px] text-muted-foreground uppercase font-medium tracking-wide">Resto (25%)</p>
+                    <p className="text-lg font-bold text-foreground">${formatCurrency(restBreakdown.totalCommission)}</p>
+                  </div>
+                </>
+              )}
+            </div>
+            
+            {/* Separator Line with = */}
+            <div className="flex items-center justify-center gap-4 my-6">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xl text-muted-foreground font-light">=</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+            
+            {/* Grand Total */}
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground uppercase tracking-widest mb-2">
+                Comisión Total — {capitalizedMonth}
+              </p>
+              <p className="text-5xl font-bold text-success">${formatCurrency(grandTotalCommission)}</p>
             </div>
           </Card>
         </>

@@ -10,6 +10,7 @@ interface ProductEntry {
   ncf: string;
   date: string;
   amount: number;
+  clientName?: string;
 }
 
 interface ProductBreakdown {
@@ -151,16 +152,16 @@ export const generateBreakdownPdf = async (data: BreakdownData, selectedMonth: s
     doc.text(`${product.percentage}%`, pageWidth - margin - 4, yPos + 6, { align: 'right' });
     yPos += 12;
 
-    // Product entries table
+    // Product entries table - now includes client name above NCF
     const tableData = product.entries.map(entry => [
       format(parseDate(entry.date), 'd MMM yyyy', { locale: es }),
-      entry.ncf,
+      entry.clientName ? `${entry.clientName}\n${entry.ncf}` : entry.ncf,
       `$${formatNumber(entry.amount)}`,
     ]);
 
     autoTable(doc, {
       startY: yPos,
-      head: [['Fecha', 'NCF', 'Monto']],
+      head: [['Fecha', 'Cliente / NCF', 'Monto']],
       body: tableData,
       margin: { left: margin, right: margin },
       styles: {
@@ -229,13 +230,13 @@ export const generateBreakdownPdf = async (data: BreakdownData, selectedMonth: s
 
     const restTableData = data.rest.entries.map(entry => [
       format(parseDate(entry.date), 'd MMM yyyy', { locale: es }),
-      entry.ncf,
+      entry.clientName ? `${entry.clientName}\n${entry.ncf}` : entry.ncf,
       `$${formatNumber(entry.amount)}`,
     ]);
 
     autoTable(doc, {
       startY: yPos,
-      head: [['Fecha', 'NCF', 'Monto']],
+      head: [['Fecha', 'Cliente / NCF', 'Monto']],
       body: restTableData,
       margin: { left: margin, right: margin },
       styles: {

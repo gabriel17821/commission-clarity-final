@@ -255,43 +255,56 @@ export const AdvancedStatistics = ({ invoices, sellerName, clients }: AdvancedSt
           </div>
         </div>
 
-        {/* Bento Grid */}
+        {/* Bento Grid - Main Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Main Commission Card */}
           <Card className="lg:col-span-1 p-6 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white relative overflow-hidden">
-            <div className="absolute top-4 right-4"><ArrowUpRight className="h-6 w-6 opacity-50" /></div>
-            <div className="flex items-center gap-2 mb-2">
-              <Wallet className="h-5 w-5 opacity-80" />
-              <span className="text-sm opacity-80">COMISIONES DE {displayName.toUpperCase()}</span>
+            <div className="absolute top-0 right-0 opacity-10">
+              <ArrowUpRight className="h-32 w-32 -mt-8 -mr-8" />
             </div>
-            <p className="text-4xl font-bold mb-2">${formatCurrency(selectedMonthStats.totalCommission)}</p>
+            <div className="flex items-center gap-2 mb-3">
+              <Wallet className="h-5 w-5 opacity-80" />
+              <span className="text-sm opacity-90 font-medium">COMISIONES DE {displayName.toUpperCase()}</span>
+            </div>
+            <p className="text-5xl font-bold mb-3">${formatCurrency(selectedMonthStats.totalCommission)}</p>
             <div className="flex items-center gap-2">
-              <span className={`px-2 py-0.5 rounded text-xs font-medium ${commissionChange >= 0 ? 'bg-white/20' : 'bg-red-400/30'}`}>
+              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${commissionChange >= 0 ? 'bg-white/25' : 'bg-red-400/40'}`}>
                 {getChangeLabel(commissionChange)}
               </span>
-              <span className="text-sm opacity-70">vs mes anterior</span>
+              <span className="text-sm opacity-80">vs mes anterior</span>
             </div>
           </Card>
 
-          <Card className="p-5 hover-lift">
+          {/* Sales Card */}
+          <Card className="p-5 hover-lift border-l-4 border-l-blue-500">
             <div className="flex items-center gap-3 mb-3">
               <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
                 <DollarSign className="h-5 w-5 text-blue-500" />
               </div>
-              <span className="text-sm text-muted-foreground font-medium">VENTAS TOTALES</span>
+              <span className="text-sm text-muted-foreground font-medium uppercase tracking-wide">Ventas Totales</span>
             </div>
             <p className="text-3xl font-bold text-foreground">${formatNumber(selectedMonthStats.totalSales)}</p>
-            {salesChange !== 0 && <span className={`text-sm ${salesChange >= 0 ? 'text-success' : 'text-destructive'}`}>{getChangeLabel(salesChange)}</span>}
+            {salesChange !== 0 && (
+              <span className={`inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded text-xs font-medium ${salesChange >= 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                {getChangeLabel(salesChange)}
+              </span>
+            )}
           </Card>
 
-          <Card className="p-5 hover-lift">
+          {/* Invoices Card */}
+          <Card className="p-5 hover-lift border-l-4 border-l-purple-500">
             <div className="flex items-center gap-3 mb-3">
               <div className="h-10 w-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
                 <Receipt className="h-5 w-5 text-purple-500" />
               </div>
-              <span className="text-sm text-muted-foreground font-medium">FACTURAS</span>
+              <span className="text-sm text-muted-foreground font-medium uppercase tracking-wide">Facturas</span>
             </div>
             <p className="text-3xl font-bold text-foreground">{selectedMonthStats.invoiceCount}</p>
-            {invoiceCountChange !== 0 && <span className={`text-sm ${invoiceCountChange >= 0 ? 'text-success' : 'text-destructive'}`}>{getChangeLabel(invoiceCountChange)}</span>}
+            {invoiceCountChange !== 0 && (
+              <span className={`inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded text-xs font-medium ${invoiceCountChange >= 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                {getChangeLabel(invoiceCountChange)}
+              </span>
+            )}
           </Card>
         </div>
 
