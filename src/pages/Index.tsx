@@ -1,25 +1,27 @@
 import { useState, useMemo, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Calculator, History, BarChart3, Layers, Settings } from "lucide-react";
+import { Calculator, History, BarChart3, Layers, Settings, TrendingUp } from "lucide-react";
 import { useProducts } from "@/hooks/useProducts";
 import { useSettings } from "@/hooks/useSettings";
 import { useInvoices } from "@/hooks/useInvoices";
 import { useClients } from "@/hooks/useClients";
 import { useSellers } from "@/hooks/useSellers";
+import { useAnalytics } from "@/hooks/useAnalytics";
 import { CalculatorView } from "@/components/CalculatorView";
 import { InvoiceHistory } from "@/components/InvoiceHistory";
 import { Statistics } from "@/components/Statistics";
 import { MonthlyBreakdown } from "@/components/MonthlyBreakdown";
 import { SellerManager } from "@/components/SellerManager";
 import { SettingsPage } from "@/components/SettingsPage";
-
+import { AnalyticsDashboard } from "@/components/analytics";
 const Index = () => {
   const { products, loading: productsLoading, addProduct, updateProduct, deleteProduct } = useProducts();
   const { restPercentage, loading: settingsLoading, updateRestPercentage, getNextNcfNumber, updateLastNcfNumber } = useSettings();
   const { invoices, loading: invoicesLoading, saveInvoice, deleteInvoice, updateInvoice, refetch: refetchInvoices } = useInvoices();
   const { clients, loading: clientsLoading, addClient, deleteClient, refetch: refetchClients } = useClients();
   const { sellers, activeSeller, setActiveSeller, addSeller, updateSeller, deleteSeller, setDefaultSeller } = useSellers();
+  const { data: analyticsData, bulkImport } = useAnalytics();
 
   const [totalInvoice, setTotalInvoice] = useState(0);
   const [productAmounts, setProductAmounts] = useState<Record<string, number>>({});
@@ -149,7 +151,7 @@ const Index = () => {
 
       <main className="mx-auto max-w-5xl px-4 py-8">
         <Tabs defaultValue="calculator" className="space-y-8">
-          <TabsList className="grid w-full grid-cols-4 h-14 p-1.5 bg-muted rounded-xl">
+          <TabsList className="grid w-full grid-cols-5 h-14 p-1.5 bg-muted rounded-xl">
             <TabsTrigger value="calculator" className="gap-2 text-base rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md text-muted-foreground">
               <Calculator className="h-5 w-5" />
               <span className="hidden sm:inline">Calculadora</span>
@@ -165,6 +167,10 @@ const Index = () => {
             <TabsTrigger value="statistics" className="gap-2 text-base rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md text-muted-foreground">
               <BarChart3 className="h-5 w-5" />
               <span className="hidden sm:inline">Estadísticas</span>
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="gap-2 text-base rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md text-muted-foreground">
+              <TrendingUp className="h-5 w-5" />
+              <span className="hidden sm:inline">Análisis</span>
             </TabsTrigger>
           </TabsList>
 
@@ -217,6 +223,15 @@ const Index = () => {
 
           <TabsContent value="statistics">
             <Statistics invoices={invoices} sellerName={activeSeller?.name} clients={clients} />
+          </TabsContent>
+
+          <TabsContent value="analytics">
+            <AnalyticsDashboard 
+              data={analyticsData}
+              clients={clients}
+              products={products}
+              onImport={bulkImport}
+            />
           </TabsContent>
         </Tabs>
       </main>
