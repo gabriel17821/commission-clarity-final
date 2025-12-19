@@ -14,6 +14,73 @@ export type Database = {
   }
   public: {
     Tables: {
+      analytics_data: {
+        Row: {
+          client_id: string | null
+          commission_amount: number
+          commission_percentage: number
+          created_at: string
+          id: string
+          invoice_id: string | null
+          product_id: string | null
+          product_name: string
+          quantity: number
+          sale_date: string
+          total_amount: number
+          unit_price: number
+        }
+        Insert: {
+          client_id?: string | null
+          commission_amount?: number
+          commission_percentage?: number
+          created_at?: string
+          id?: string
+          invoice_id?: string | null
+          product_id?: string | null
+          product_name: string
+          quantity?: number
+          sale_date?: string
+          total_amount?: number
+          unit_price?: number
+        }
+        Update: {
+          client_id?: string | null
+          commission_amount?: number
+          commission_percentage?: number
+          created_at?: string
+          id?: string
+          invoice_id?: string | null
+          product_id?: string | null
+          product_name?: string
+          quantity?: number
+          sale_date?: string
+          total_amount?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analytics_data_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "analytics_data_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "analytics_data_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           address: string | null
