@@ -226,11 +226,12 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="analytics">
-            <AnalyticsDashboard 
-              data={analyticsData}
+            <RealAnalyticsDashboard 
+              invoices={invoices}
               clients={clients}
               products={products}
-              onImport={bulkImport}
+              sellers={sellers}
+              activeSeller={activeSeller}
             />
           </TabsContent>
         </Tabs>
