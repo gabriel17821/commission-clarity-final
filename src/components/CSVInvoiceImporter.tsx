@@ -9,11 +9,23 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Upload, Download, FileText, AlertCircle, CheckCircle2, Loader2, XCircle } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Upload, Download, FileText, AlertCircle, CheckCircle2, Loader2, XCircle, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { parse, format } from 'date-fns';
 import { formatCurrency } from '@/lib/formatters';
-import { normalizeText, bestFuzzyMatch } from '@/lib/textMatch';
+import {
+  findSavedProductMatch,
+  findSavedClientMatch,
+  saveProductMatch,
+  saveClientMatch,
+} from '@/lib/matchingStore';
 
 interface Product {
   id: string;
@@ -32,18 +44,18 @@ interface ParsedRow {
   fecha: string;
   cliente: string;
   producto: string;
-  cantidad: string;
-  precioUnitario: string;
+  cantidad: number;
+  precioUnitario: number;
   isValid: boolean;
   errors: string[];
-  // Resolved values (only if valid)
+  // Resolved
   resolvedDate?: Date;
-  resolvedQuantity?: number;
-  resolvedUnitPrice?: number;
   resolvedProductId?: string;
-  resolvedProductName?: string; // Nombre del producto matcheado
+  resolvedProductName?: string;
   resolvedClientId?: string;
-  resolvedClientName?: string; // Nombre del cliente matcheado
+  resolvedClientName?: string;
+  needsManualProductMatch?: boolean;
+  needsManualClientMatch?: boolean;
 }
 
 interface GroupedInvoice {
@@ -73,7 +85,7 @@ interface CSVInvoiceImporterProps {
   }[]) => Promise<void>;
 }
 
-// Simple date parser - tries common formats
+// Parse date - supports common formats
 function parseDate(str: string): Date | null {
   const trimmed = str.trim();
   if (!trimmed) return null;
@@ -93,42 +105,34 @@ function parseDate(str: string): Date | null {
   return null;
 }
 
-function matchProduct(name: string, products: Product[]): Product | undefined {
-  const input = normalizeText(name);
-  if (!input) return undefined;
-
-  const exact = products.find((p) => normalizeText(p.name) === input);
-  if (exact) return exact;
-
-  const { match } = bestFuzzyMatch(name, products, { minScore: 0.62 });
-  return match;
+// Parse number from string
+function parseNumber(str: string): number | null {
+  if (!str) return null;
+  const cleaned = str.replace(/[^\d.,-]/g, '').replace(',', '.');
+  const num = parseFloat(cleaned);
+  return isNaN(num) || num <= 0 ? null : num;
 }
 
-function matchClient(name: string, clients: Client[]): Client | undefined {
-  const input = normalizeText(name);
-  if (!input) return undefined;
-
-  const exact = clients.find((c) => normalizeText(c.name) === input);
-  if (exact) return exact;
-
-  const { match } = bestFuzzyMatch(name, clients, { minScore: 0.68 });
-  return match;
+// Extract NCF suffix (last 4 digits)
+function extractNcfSuffix(ncfRaw: string): string {
+  const digits = (ncfRaw || '').replace(/\D/g, '');
+  return digits.slice(-4).padStart(4, '0');
 }
 
 export const CSVInvoiceImporter = ({ products, clients, onImport, onBulkImport }: CSVInvoiceImporterProps) => {
   const [open, setOpen] = useState(false);
-  const [parsedRows, setParsedRows] = useState<ParsedRow[] | null>(null);
-  const [groupedInvoices, setGroupedInvoices] = useState<GroupedInvoice[] | null>(null);
+  const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
+  const [groupedInvoices, setGroupedInvoices] = useState<GroupedInvoice[]>([]);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [manualMatches, setManualMatches] = useState<Record<string, { productId?: string; clientId?: string }>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const downloadTemplate = () => {
     const template = `NCF_SUFFIX,FECHA,CLIENTE,PRODUCTO,CANTIDAD,PRECIO_UNITARIO
-0001,2024-01-15,Farmacia Central,Azetabio Repelente antimosquitos organico 100ml,10,150.00
-0001,2024-01-15,Farmacia Central,Otro Producto,5,200.50
-0002,2024-01-16,Farmacia Norte,AZETABIO REPELENTE ANTIMOSQUITOS,8,150.00
-0002,2024-01-16,Farmacia Norte,Producto C,3,300.00`;
+B0100002904,2024-10-31,FARMACIA MARIA PICHARDO SRL,PLEXGRIP JARABE ANTIGRIPAL 120 ML,6,185.0
+B0100002904,2024-10-31,FARMACIA MARIA PICHARDO SRL,AMBROXOL JARABE 120 ML,6,145.0
+B0100002905,2024-11-01,FARMACIA CENTRAL,CETERIPLEX CETIRIZINA TAB 1/100,3,900.0`;
 
     const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -140,10 +144,10 @@ export const CSVInvoiceImporter = ({ products, clients, onImport, onBulkImport }
   };
 
   /**
-   * STRICT PARSER: 6 columnas exactas por fila. No infiere totales ni concatena.
-   * La “inteligencia” ocurre únicamente al hacer matching de producto/cliente.
+   * STRICT PARSER for format:
+   * NCF_SUFFIX,FECHA,CLIENTE,PRODUCTO,CANTIDAD,PRECIO_UNITARIO
    */
-  const parseCSVStrict = (text: string): ParsedRow[] => {
+  const parseCSV = (text: string): ParsedRow[] => {
     const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim().split('\n');
     const rows: ParsedRow[] = [];
 
@@ -153,91 +157,128 @@ export const CSVInvoiceImporter = ({ products, clients, onImport, onBulkImport }
 
       const parts = line.split(',').map((p) => p.trim());
 
-      // Skip header row (check first column)
+      // Skip header row
       const firstCol = parts[0]?.toLowerCase() || '';
       if (firstCol.includes('ncf') || firstCol.includes('suffix') || firstCol === 'fecha') {
         continue;
       }
 
+      // Must have exactly 6 columns
+      if (parts.length !== 6) {
+        rows.push({
+          lineNumber: i + 1,
+          ncfSuffix: '',
+          fecha: '',
+          cliente: '',
+          producto: '',
+          cantidad: 0,
+          precioUnitario: 0,
+          isValid: false,
+          errors: [`Línea ${i + 1}: necesita 6 columnas, tiene ${parts.length}`],
+        });
+        continue;
+      }
+
+      const [ncfRaw, fecha, cliente, producto, cantidadStr, precioStr] = parts;
       const errors: string[] = [];
 
-      if (parts.length !== 6) {
-        errors.push(`Columnas inválidas (tiene ${parts.length}, necesita 6)`);
+      // Parse each field
+      const ncfSuffix = extractNcfSuffix(ncfRaw);
+      if (!ncfSuffix || ncfSuffix === '0000') {
+        errors.push('NCF inválido');
       }
 
-      const [ncfRaw, fecha, cliente, producto, cantidad, precioUnitario] = parts;
+      const parsedDate = parseDate(fecha);
+      if (!parsedDate) {
+        errors.push('Fecha inválida');
+      }
 
-      // Extraer últimos 4 dígitos del NCF (soporta "B0100002904" o "2904")
-      const ncfDigits = (ncfRaw || '').replace(/\D/g, '');
-      const ncfSuffix = ncfDigits.slice(-4).padStart(4, '0');
+      const cantidad = parseNumber(cantidadStr);
+      if (cantidad === null) {
+        errors.push(`Cantidad inválida: "${cantidadStr}"`);
+      }
 
-      if (!ncfDigits) errors.push('NCF vacío');
-      if (!fecha) errors.push('Fecha vacía');
-      if (!producto) errors.push('Producto vacío');
-      if (!cantidad) errors.push('Cantidad vacía');
-      if (!precioUnitario) errors.push('Precio vacío');
+      const precioUnitario = parseNumber(precioStr);
+      if (precioUnitario === null) {
+        errors.push(`Precio inválido: "${precioStr}"`);
+      }
 
-      const row: ParsedRow = {
+      if (!producto) {
+        errors.push('Producto vacío');
+      }
+
+      // Try to match product (first check saved matches, then exact match)
+      let resolvedProductId: string | undefined;
+      let resolvedProductName: string | undefined;
+      let needsManualProductMatch = false;
+
+      const savedProductMatch = findSavedProductMatch(producto);
+      if (savedProductMatch) {
+        // Verify the saved match still exists
+        const productExists = products.find(p => p.id === savedProductMatch.matchedId);
+        if (productExists) {
+          resolvedProductId = productExists.id;
+          resolvedProductName = productExists.name;
+        }
+      }
+
+      if (!resolvedProductId) {
+        // Try exact match (case-insensitive)
+        const exactMatch = products.find(
+          p => p.name.toLowerCase().trim() === producto.toLowerCase().trim()
+        );
+        if (exactMatch) {
+          resolvedProductId = exactMatch.id;
+          resolvedProductName = exactMatch.name;
+        } else {
+          needsManualProductMatch = true;
+        }
+      }
+
+      // Try to match client
+      let resolvedClientId: string | undefined;
+      let resolvedClientName: string | undefined;
+      let needsManualClientMatch = false;
+
+      const savedClientMatch = findSavedClientMatch(cliente);
+      if (savedClientMatch) {
+        const clientExists = clients.find(c => c.id === savedClientMatch.matchedId);
+        if (clientExists) {
+          resolvedClientId = clientExists.id;
+          resolvedClientName = clientExists.name;
+        }
+      }
+
+      if (!resolvedClientId && cliente) {
+        const exactMatch = clients.find(
+          c => c.name.toLowerCase().trim() === cliente.toLowerCase().trim()
+        );
+        if (exactMatch) {
+          resolvedClientId = exactMatch.id;
+          resolvedClientName = exactMatch.name;
+        } else {
+          needsManualClientMatch = true;
+        }
+      }
+
+      rows.push({
         lineNumber: i + 1,
         ncfSuffix,
-        fecha: fecha || '',
-        cliente: cliente || '',
-        producto: producto || '',
-        cantidad: cantidad || '',
-        precioUnitario: precioUnitario || '',
+        fecha,
+        cliente,
+        producto,
+        cantidad: cantidad || 0,
+        precioUnitario: precioUnitario || 0,
         isValid: errors.length === 0,
         errors,
-      };
-
-      if (row.isValid) {
-        // Parse date
-        const parsedDate = parseDate(row.fecha);
-        if (!parsedDate) {
-          row.errors.push('Fecha inválida');
-          row.isValid = false;
-        } else {
-          row.resolvedDate = parsedDate;
-        }
-
-        // Parse quantity
-        const qtyStr = row.cantidad.replace(/[^\d.,-]/g, '').replace(',', '.');
-        const qty = parseFloat(qtyStr);
-        if (isNaN(qty) || qty <= 0) {
-          row.errors.push(`Cantidad inválida: "${row.cantidad}"`);
-          row.isValid = false;
-        } else {
-          row.resolvedQuantity = qty;
-        }
-
-        // Parse price
-        const priceStr = row.precioUnitario.replace(/[^\d.,-]/g, '').replace(',', '.');
-        const price = parseFloat(priceStr);
-        if (isNaN(price) || price <= 0) {
-          row.errors.push(`Precio inválido: "${row.precioUnitario}"`);
-          row.isValid = false;
-        } else {
-          row.resolvedUnitPrice = price;
-        }
-
-        // Match product with fuzzy logic
-        const matchedProduct = matchProduct(row.producto, products);
-        if (!matchedProduct) {
-          row.errors.push(`Producto no encontrado: "${row.producto}"`);
-          row.isValid = false;
-        } else {
-          row.resolvedProductId = matchedProduct.id;
-          row.resolvedProductName = matchedProduct.name;
-        }
-
-        // Match client with fuzzy logic
-        const matchedClient = matchClient(row.cliente, clients);
-        if (matchedClient) {
-          row.resolvedClientId = matchedClient.id;
-          row.resolvedClientName = matchedClient.name;
-        }
-      }
-
-      rows.push(row);
+        resolvedDate: parsedDate || undefined,
+        resolvedProductId,
+        resolvedProductName,
+        resolvedClientId,
+        resolvedClientName,
+        needsManualProductMatch,
+        needsManualClientMatch,
+      });
     }
 
     return rows;
@@ -247,12 +288,11 @@ export const CSVInvoiceImporter = ({ products, clients, onImport, onBulkImport }
     const groups = new Map<string, GroupedInvoice>();
 
     for (const row of rows) {
-      const ncf = row.ncfSuffix.replace(/\D/g, '').slice(-4).padStart(4, '0');
-      if (!ncf || ncf === '0000') continue;
+      if (!row.isValid || !row.ncfSuffix || row.ncfSuffix === '0000') continue;
 
-      if (!groups.has(ncf)) {
-        groups.set(ncf, {
-          ncfSuffix: ncf,
+      if (!groups.has(row.ncfSuffix)) {
+        groups.set(row.ncfSuffix, {
+          ncfSuffix: row.ncfSuffix,
           date: row.resolvedDate || new Date(),
           clientName: row.cliente,
           clientId: row.resolvedClientId,
@@ -262,13 +302,16 @@ export const CSVInvoiceImporter = ({ products, clients, onImport, onBulkImport }
         });
       }
 
-      const group = groups.get(ncf)!;
+      const group = groups.get(row.ncfSuffix)!;
       group.rows.push(row);
 
-      if (!row.isValid) {
+      // Check if any row needs manual match
+      if (row.needsManualProductMatch && !manualMatches[`p-${row.producto}`]?.productId) {
         group.hasErrors = true;
-      } else if (row.resolvedQuantity && row.resolvedUnitPrice) {
-        group.total += row.resolvedQuantity * row.resolvedUnitPrice;
+      }
+
+      if (row.cantidad && row.precioUnitario) {
+        group.total += row.cantidad * row.precioUnitario;
       }
     }
 
@@ -280,25 +323,30 @@ export const CSVInvoiceImporter = ({ products, clients, onImport, onBulkImport }
     if (!file) return;
 
     setLoading(true);
+    setManualMatches({});
+
     const reader = new FileReader();
 
     reader.onload = (event) => {
       const text = event.target?.result as string;
-      const rows = parseCSVStrict(text);
+      const rows = parseCSV(text);
       setParsedRows(rows);
 
       if (rows.length === 0) {
         toast.error('No se encontraron datos en el archivo');
-        setGroupedInvoices(null);
+        setGroupedInvoices([]);
       } else {
         const groups = groupRowsByNCF(rows);
         setGroupedInvoices(groups);
 
         const validCount = rows.filter((r) => r.isValid).length;
-        const invalidCount = rows.filter((r) => !r.isValid).length;
+        const needsMatchCount = rows.filter((r) => r.needsManualProductMatch).length;
 
-        if (invalidCount > 0) toast.warning(`${validCount} filas válidas, ${invalidCount} con errores`);
-        else toast.success(`${validCount} filas procesadas correctamente`);
+        if (needsMatchCount > 0) {
+          toast.warning(`${validCount} filas, ${needsMatchCount} necesitan matching manual`);
+        } else {
+          toast.success(`${validCount} filas procesadas`);
+        }
       }
 
       setLoading(false);
@@ -312,33 +360,93 @@ export const CSVInvoiceImporter = ({ products, clients, onImport, onBulkImport }
     reader.readAsText(file);
   };
 
+  const handleManualProductMatch = (csvProductName: string, productId: string) => {
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+
+    // Save to persistent storage
+    saveProductMatch(csvProductName, productId, product.name);
+
+    // Update local state
+    setManualMatches(prev => ({
+      ...prev,
+      [`p-${csvProductName}`]: { productId }
+    }));
+
+    // Update parsed rows
+    setParsedRows(prev => prev.map(row => {
+      if (row.producto === csvProductName) {
+        return {
+          ...row,
+          resolvedProductId: productId,
+          resolvedProductName: product.name,
+          needsManualProductMatch: false,
+        };
+      }
+      return row;
+    }));
+
+    toast.success(`Match guardado: ${csvProductName} → ${product.name}`);
+  };
+
+  const handleManualClientMatch = (csvClientName: string, clientId: string) => {
+    const client = clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    // Save to persistent storage
+    saveClientMatch(csvClientName, clientId, client.name);
+
+    // Update local state
+    setManualMatches(prev => ({
+      ...prev,
+      [`c-${csvClientName}`]: { clientId }
+    }));
+
+    // Update parsed rows
+    setParsedRows(prev => prev.map(row => {
+      if (row.cliente === csvClientName) {
+        return {
+          ...row,
+          resolvedClientId: clientId,
+          resolvedClientName: client.name,
+          needsManualClientMatch: false,
+        };
+      }
+      return row;
+    }));
+
+    toast.success(`Match guardado: ${csvClientName} → ${client.name}`);
+  };
+
   const resetImport = () => {
-    setParsedRows(null);
-    setGroupedInvoices(null);
+    setParsedRows([]);
+    setGroupedInvoices([]);
+    setManualMatches({});
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleImport = async () => {
-    if (!groupedInvoices || groupedInvoices.length === 0) return;
+    // Regroup with updated rows
+    const groups = groupRowsByNCF(parsedRows);
 
-    const validInvoices = groupedInvoices
-      .filter((inv) => !inv.hasErrors && inv.rows.some((r) => r.isValid && r.resolvedProductId))
+    const validInvoices = groups
+      .filter((inv) => inv.rows.every(r => r.resolvedProductId))
       .map((inv) => ({
         ncfSuffix: inv.ncfSuffix,
         invoiceDate: inv.date,
-        clientId: inv.clientId,
+        clientId: inv.rows[0]?.resolvedClientId,
         lines: inv.rows
-          .filter((r) => r.isValid && r.resolvedProductId && r.resolvedQuantity && r.resolvedUnitPrice)
+          .filter((r) => r.resolvedProductId && r.cantidad > 0 && r.precioUnitario > 0)
           .map((r) => ({
             productId: r.resolvedProductId!,
-            quantity: r.resolvedQuantity!,
-            unitPrice: r.resolvedUnitPrice!,
+            quantity: r.cantidad,
+            unitPrice: r.precioUnitario,
           })),
       }))
       .filter((inv) => inv.lines.length > 0);
 
     if (validInvoices.length === 0) {
-      toast.error('No hay facturas válidas para importar');
+      toast.error('No hay facturas válidas para importar. Completa el matching de productos.');
       return;
     }
 
@@ -346,26 +454,14 @@ export const CSVInvoiceImporter = ({ products, clients, onImport, onBulkImport }
 
     try {
       if (validInvoices.length === 1) {
-        const inv = validInvoices[0];
-        onImport({
-          ncfSuffix: inv.ncfSuffix,
-          invoiceDate: inv.invoiceDate,
-          clientId: inv.clientId,
-          lines: inv.lines,
-        });
-        toast.success(`Factura B010000${inv.ncfSuffix} importada`);
+        onImport(validInvoices[0]);
+        toast.success(`Factura B010000${validInvoices[0].ncfSuffix} importada`);
       } else if (onBulkImport) {
         await onBulkImport(validInvoices);
         toast.success(`${validInvoices.length} facturas importadas`);
       } else {
-        const inv = validInvoices[0];
-        onImport({
-          ncfSuffix: inv.ncfSuffix,
-          invoiceDate: inv.invoiceDate,
-          clientId: inv.clientId,
-          lines: inv.lines,
-        });
-        toast.success(`Primera factura importada (${validInvoices.length - 1} pendientes)`);
+        onImport(validInvoices[0]);
+        toast.success(`Primera factura importada`);
       }
 
       setOpen(false);
@@ -378,9 +474,19 @@ export const CSVInvoiceImporter = ({ products, clients, onImport, onBulkImport }
     }
   };
 
-  const validInvoicesCount = groupedInvoices?.filter((inv) => !inv.hasErrors && inv.rows.some((r) => r.isValid)).length || 0;
-  const totalRowsValid = parsedRows?.filter((r) => r.isValid).length || 0;
-  const totalRowsInvalid = parsedRows?.filter((r) => !r.isValid).length || 0;
+  // Get unique unmatched products
+  const unmatchedProducts = Array.from(
+    new Set(parsedRows.filter(r => r.needsManualProductMatch && !r.resolvedProductId).map(r => r.producto))
+  );
+
+  // Get unique unmatched clients
+  const unmatchedClients = Array.from(
+    new Set(parsedRows.filter(r => r.needsManualClientMatch && !r.resolvedClientId).map(r => r.cliente))
+  ).filter(Boolean);
+
+  const allProductsMatched = unmatchedProducts.length === 0;
+  const validRows = parsedRows.filter(r => r.isValid);
+  const canImport = validRows.length > 0 && allProductsMatched;
 
   return (
     <Dialog
@@ -397,22 +503,23 @@ export const CSVInvoiceImporter = ({ products, clients, onImport, onBulkImport }
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
             Importar Facturas desde CSV
           </DialogTitle>
           <DialogDescription>
-            6 columnas exactas: NCF_SUFFIX, FECHA, CLIENTE, PRODUCTO, CANTIDAD, PRECIO_UNITARIO
+            Formato: NCF_SUFFIX, FECHA, CLIENTE, PRODUCTO, CANTIDAD, PRECIO_UNITARIO
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 flex-1 overflow-y-auto">
+          {/* Template download */}
           <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-dashed">
             <div>
               <p className="text-sm font-medium">Template CSV</p>
-              <p className="text-xs text-muted-foreground">NCF_SUFFIX, FECHA, CLIENTE, PRODUCTO, CANTIDAD, PRECIO_UNITARIO</p>
+              <p className="text-xs text-muted-foreground">B0100002904,2024-10-31,CLIENTE,PRODUCTO,6,185.0</p>
             </div>
             <Button variant="outline" size="sm" onClick={downloadTemplate} className="gap-2">
               <Download className="h-4 w-4" />
@@ -420,9 +527,10 @@ export const CSVInvoiceImporter = ({ products, clients, onImport, onBulkImport }
             </Button>
           </div>
 
+          {/* File upload */}
           <label
             htmlFor="csv-invoices"
-            className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-lg cursor-pointer bg-muted/20 hover:bg-muted/40 transition-colors"
+            className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer bg-muted/20 hover:bg-muted/40 transition-colors"
           >
             {loading ? (
               <div className="flex flex-col items-center gap-2">
@@ -448,87 +556,136 @@ export const CSVInvoiceImporter = ({ products, clients, onImport, onBulkImport }
             />
           </label>
 
-          {groupedInvoices && groupedInvoices.length > 0 && (
+          {/* Manual matching section */}
+          {unmatchedProducts.length > 0 && (
+            <div className="p-4 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800 space-y-3">
+              <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                <AlertCircle className="h-5 w-5" />
+                <span className="font-semibold">Productos sin match ({unmatchedProducts.length})</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Selecciona el producto correcto del catálogo. El match se guardará para futuras importaciones.
+              </p>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {unmatchedProducts.map((csvName) => (
+                  <div key={csvName} className="flex items-center gap-2 p-2 bg-background rounded border">
+                    <span className="text-sm font-medium flex-1 truncate">{csvName}</span>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <Select onValueChange={(value) => handleManualProductMatch(csvName, value)}>
+                      <SelectTrigger className="w-64">
+                        <SelectValue placeholder="Seleccionar producto..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {products.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name} ({p.percentage}%)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Unmatched clients */}
+          {unmatchedClients.length > 0 && (
+            <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800 space-y-3">
+              <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400">
+                <AlertCircle className="h-5 w-5" />
+                <span className="font-semibold">Clientes sin match ({unmatchedClients.length})</span>
+              </div>
+              <div className="space-y-2 max-h-32 overflow-y-auto">
+                {unmatchedClients.map((csvName) => (
+                  <div key={csvName} className="flex items-center gap-2 p-2 bg-background rounded border">
+                    <span className="text-sm font-medium flex-1 truncate">{csvName}</span>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <Select onValueChange={(value) => handleManualClientMatch(csvName, value)}>
+                      <SelectTrigger className="w-64">
+                        <SelectValue placeholder="Seleccionar cliente..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {clients.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Preview */}
+          {parsedRows.length > 0 && (
             <div className="space-y-3">
               <div className="p-3 bg-primary/10 rounded-lg border border-primary/20 flex items-center justify-between">
                 <div>
                   <p className="text-sm font-semibold text-primary">
-                    {validInvoicesCount} factura{validInvoicesCount !== 1 ? 's' : ''} lista{validInvoicesCount !== 1 ? 's' : ''} para importar
+                    {validRows.length} líneas válidas
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    {totalRowsValid} filas válidas
-                    {totalRowsInvalid > 0 && <span className="text-destructive"> · {totalRowsInvalid} con errores</span>}
-                  </p>
+                  {!allProductsMatched && (
+                    <p className="text-xs text-amber-600">
+                      {unmatchedProducts.length} productos pendientes de match
+                    </p>
+                  )}
                 </div>
                 <Button variant="ghost" size="sm" onClick={resetImport}>
                   Limpiar
                 </Button>
               </div>
 
-              <div className="max-h-72 overflow-y-auto space-y-3 border rounded-lg p-3">
-                {groupedInvoices.map((inv) => (
-                  <div
-                    key={inv.ncfSuffix}
-                    className={`p-3 rounded-lg border ${inv.hasErrors ? 'bg-destructive/5 border-destructive/30' : 'bg-card'}`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        {inv.hasErrors ? (
-                          <XCircle className="h-4 w-4 text-destructive" />
-                        ) : (
-                          <CheckCircle2 className="h-4 w-4 text-success" />
-                        )}
-                        <span className="font-mono font-bold">B010000{inv.ncfSuffix}</span>
-                        <span className="text-xs text-muted-foreground">{format(inv.date, 'dd/MM/yyyy')}</span>
-                      </div>
-                      <span className="text-sm font-semibold">{formatCurrency(inv.total)}</span>
-                    </div>
-
-                    {/* Show matched client */}
-                    {inv.rows[0]?.resolvedClientName && (
-                      <div className="text-xs mb-2 flex items-center gap-1">
-                        <span className="text-muted-foreground">Cliente:</span>
-                        <span className="font-medium text-primary">{inv.rows[0].resolvedClientName}</span>
-                        {inv.rows[0].resolvedClientName !== inv.clientName && (
-                          <span className="text-muted-foreground/60 italic">← {inv.clientName}</span>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="space-y-2">
-                      {inv.rows.map((r) => (
-                        <div key={`${inv.ncfSuffix}-${r.lineNumber}`} className="text-xs">
-                          {r.isValid ? (
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1">
-                                  <span className="text-muted-foreground shrink-0">L{r.lineNumber}</span>
-                                  <span className="font-medium text-primary truncate">{r.resolvedProductName}</span>
-                                </div>
-                                {r.resolvedProductName !== r.producto && (
-                                  <div className="text-[10px] text-muted-foreground/60 italic pl-5 truncate">
-                                    ← {r.producto}
-                                  </div>
-                                )}
-                              </div>
-                              <span className="text-muted-foreground shrink-0">
-                                {r.resolvedQuantity} × {formatCurrency(r.resolvedUnitPrice || 0)}
-                              </span>
+              <div className="max-h-60 overflow-y-auto border rounded-lg">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/50 sticky top-0">
+                    <tr>
+                      <th className="px-2 py-1.5 text-left font-medium">NCF</th>
+                      <th className="px-2 py-1.5 text-left font-medium">Fecha</th>
+                      <th className="px-2 py-1.5 text-left font-medium">Producto</th>
+                      <th className="px-2 py-1.5 text-right font-medium">Cant</th>
+                      <th className="px-2 py-1.5 text-right font-medium">Precio</th>
+                      <th className="px-2 py-1.5 text-right font-medium">Total</th>
+                      <th className="px-2 py-1.5 text-center font-medium">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {parsedRows.map((row, idx) => (
+                      <tr key={idx} className={row.isValid ? '' : 'bg-destructive/5'}>
+                        <td className="px-2 py-1.5 font-mono">{row.ncfSuffix}</td>
+                        <td className="px-2 py-1.5">{row.fecha}</td>
+                        <td className="px-2 py-1.5">
+                          {row.resolvedProductName ? (
+                            <div>
+                              <span className="text-primary font-medium">{row.resolvedProductName}</span>
+                              {row.resolvedProductName !== row.producto && (
+                                <span className="block text-[10px] text-muted-foreground italic">← {row.producto}</span>
+                              )}
                             </div>
                           ) : (
-                            <div className="flex items-start gap-2 text-destructive">
-                              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                              <div className="min-w-0">
-                                <p className="font-medium truncate">L{r.lineNumber}: {r.producto || '(sin producto)'}</p>
-                                <p className="text-[11px] opacity-90">{r.errors.join(' · ')}</p>
-                              </div>
-                            </div>
+                            <span className="text-amber-600">{row.producto}</span>
                           )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                        </td>
+                        <td className="px-2 py-1.5 text-right">{row.cantidad}</td>
+                        <td className="px-2 py-1.5 text-right">{formatCurrency(row.precioUnitario)}</td>
+                        <td className="px-2 py-1.5 text-right font-medium">
+                          {formatCurrency(row.cantidad * row.precioUnitario)}
+                        </td>
+                        <td className="px-2 py-1.5 text-center">
+                          {row.isValid && row.resolvedProductId ? (
+                            <CheckCircle2 className="h-4 w-4 text-green-500 mx-auto" />
+                          ) : row.isValid ? (
+                            <AlertCircle className="h-4 w-4 text-amber-500 mx-auto" />
+                          ) : (
+                            <XCircle className="h-4 w-4 text-destructive mx-auto" />
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
@@ -538,14 +695,14 @@ export const CSVInvoiceImporter = ({ products, clients, onImport, onBulkImport }
           <Button variant="outline" onClick={() => setOpen(false)} disabled={importing}>
             Cancelar
           </Button>
-          <Button onClick={handleImport} disabled={importing || !groupedInvoices || validInvoicesCount === 0}>
+          <Button onClick={handleImport} disabled={importing || !canImport}>
             {importing ? (
               <span className="flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Importando...
               </span>
             ) : (
-              'Importar'
+              `Importar${validRows.length > 0 ? ` (${validRows.length} líneas)` : ''}`
             )}
           </Button>
         </DialogFooter>
