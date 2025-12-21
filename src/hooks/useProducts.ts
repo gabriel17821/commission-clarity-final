@@ -88,5 +88,29 @@ export const useProducts = () => {
     return true;
   };
 
-  return { products, loading, addProduct, updateProduct, deleteProduct, refetch: fetchProducts };
+  const bulkAddProducts = async (productsToAdd: { name: string; percentage: number }[]) => {
+    const COLORS = ['#10b981', '#f59e0b', '#6366f1', '#ec4899', '#8b5cf6', '#14b8a6', '#f97316', '#06b6d4'];
+    
+    const records = productsToAdd.map((p, idx) => ({
+      name: p.name,
+      percentage: p.percentage,
+      color: COLORS[(products.length + idx) % COLORS.length],
+      is_default: false
+    }));
+
+    const { data, error } = await supabase
+      .from('products')
+      .insert(records)
+      .select();
+    
+    if (error) {
+      toast.error('Error al importar productos');
+      console.error(error);
+      throw error;
+    }
+    
+    setProducts([...products, ...(data || [])]);
+  };
+
+  return { products, loading, addProduct, updateProduct, deleteProduct, bulkAddProducts, refetch: fetchProducts };
 };

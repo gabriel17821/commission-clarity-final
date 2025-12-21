@@ -16,7 +16,7 @@ import { SellerManager } from "@/components/SellerManager";
 import { SettingsPage } from "@/components/SettingsPage";
 import { VisitPrepDashboard } from "@/components/analytics/VisitPrepDashboard";
 const Index = () => {
-  const { products, loading: productsLoading, addProduct, updateProduct, deleteProduct } = useProducts();
+  const { products, loading: productsLoading, addProduct, updateProduct, deleteProduct, bulkAddProducts } = useProducts();
   const { restPercentage, loading: settingsLoading, updateRestPercentage, getNextNcfNumber, updateLastNcfNumber } = useSettings();
   const { clients, loading: clientsLoading, addClient, deleteClient, refetch: refetchClients } = useClients();
   const { sellers, activeSeller, setActiveSeller, addSeller, updateSeller, deleteSeller, setDefaultSeller } = useSellers();
@@ -220,6 +220,7 @@ const Index = () => {
               onDeleteProduct={deleteProduct}
               onSaveInvoice={handleSaveInvoice}
               onBulkImport={handleBulkImport}
+              onBulkAddProducts={bulkAddProducts}
               suggestedNcf={suggestedNcf}
               lastInvoice={lastInvoice}
               clients={clients}
