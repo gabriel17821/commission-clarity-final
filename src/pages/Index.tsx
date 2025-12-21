@@ -220,7 +220,6 @@ const Index = () => {
               onDeleteProduct={deleteProduct}
               onSaveInvoice={handleSaveInvoice}
               onBulkImport={handleBulkImport}
-              onBulkAddProducts={bulkAddProducts}
               suggestedNcf={suggestedNcf}
               lastInvoice={lastInvoice}
               clients={clients}
@@ -271,6 +270,11 @@ const Index = () => {
         onOpenChange={setSettingsOpen}
         clients={clients}
         onRefetchClients={refetchClients}
+        products={products}
+        onAddProduct={addProduct}
+        onUpdateProduct={updateProduct}
+        onDeleteProduct={deleteProduct}
+        onBulkAddProducts={bulkAddProducts}
       />
     </div>
   );

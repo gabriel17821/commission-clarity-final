@@ -6,15 +6,32 @@ import { Settings, Upload, Download, Trash2, FileUp, AlertTriangle, Check, Loade
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Client } from '@/hooks/useClients';
+import { ProductCatalogDialog } from '@/components/ProductCatalogDialog';
+import { ProductCSVImporter } from '@/components/ProductCSVImporter';
 
 interface SettingsPageProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   clients: Client[];
   onRefetchClients: () => void;
+  products: { id: string; name: string; percentage: number }[];
+  onAddProduct: (name: string, percentage: number) => Promise<any>;
+  onUpdateProduct: (id: string, updates: any) => Promise<boolean>;
+  onDeleteProduct: (id: string) => Promise<boolean>;
+  onBulkAddProducts: (products: { name: string; percentage: number }[]) => Promise<void>;
 }
 
-export const SettingsPage = ({ open, onOpenChange, clients, onRefetchClients }: SettingsPageProps) => {
+export const SettingsPage = ({
+  open,
+  onOpenChange,
+  clients,
+  onRefetchClients,
+  products,
+  onAddProduct,
+  onUpdateProduct,
+  onDeleteProduct,
+  onBulkAddProducts,
+}: SettingsPageProps) => {
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -241,6 +258,34 @@ export const SettingsPage = ({ open, onOpenChange, clients, onRefetchClients }: 
         </DialogHeader>
 
         <div className="space-y-6 pt-4">
+          {/* Productos */}
+          <Card className="p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Package className="h-5 w-5 text-primary" />
+                <h3 className="font-semibold">Productos</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <ProductCatalogDialog
+                  products={products as any}
+                  onUpdateProduct={onUpdateProduct as any}
+                  onDeleteProduct={(id) => { void onDeleteProduct(id); }}
+                  onAddProduct={onAddProduct}
+                />
+                <ProductCSVImporter
+                  existingProducts={products.map(p => p.name)}
+                  onBulkImport={onBulkAddProducts}
+                />
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Importa todos tus productos una sola vez (por defecto 25%) y edítalos cuando lo necesites.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Productos actuales: <strong>{products.length}</strong>
+            </p>
+          </Card>
+
           {/* Import Clients CSV */}
           <Card className="p-4 space-y-3">
             <div className="flex items-center gap-2">
