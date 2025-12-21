@@ -52,6 +52,75 @@ interface CSVInvoiceImporterProps {
   }[]) => Promise<void>;
 }
 
+// Header detection patterns
+const HEADER_PATTERNS = [
+  /^ncf[-_]?suffix$/i,
+  /^ncf$/i,
+  /^fecha$/i,
+  /^date$/i,
+  /^cliente$/i,
+  /^client$/i,
+  /^producto$/i,
+  /^product$/i,
+  /^cantidad$/i,
+  /^qty$/i,
+  /^quantity$/i,
+  /^precio[-_]?unitario$/i,
+  /^unit[-_]?price$/i,
+  /^price$/i,
+];
+
+function isHeaderRow(parts: string[]): boolean {
+  // If more than half of the cells match header patterns, it's a header row
+  const matches = parts.filter(p => 
+    HEADER_PATTERNS.some(pattern => pattern.test(p.trim()))
+  ).length;
+  return matches >= 3;
+}
+
+function parseDate(dateStr: string): Date | null {
+  const trimmed = dateStr.trim();
+  if (!trimmed) return null;
+  
+  // Try multiple date formats
+  const formats = [
+    'yyyy-MM-dd',
+    'dd/MM/yyyy',
+    'MM/dd/yyyy',
+    'd/M/yyyy',
+    'dd-MM-yyyy',
+    'MM-dd-yyyy',
+    'yyyy/MM/dd',
+  ];
+  
+  for (const fmt of formats) {
+    try {
+      const parsed = parse(trimmed, fmt, new Date());
+      if (!isNaN(parsed.getTime()) && parsed.getFullYear() > 1900 && parsed.getFullYear() < 2100) {
+        return parsed;
+      }
+    } catch {
+      continue;
+    }
+  }
+  
+  return null;
+}
+
+function cleanNumber(value: string): number {
+  // Remove any non-numeric characters except dots and minus
+  const cleaned = value.replace(/[^\d.-]/g, '').trim();
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? 0 : num;
+}
+
+function normalizeNCF(ncf: string): string {
+  // Extract just the numeric suffix (last 4 digits)
+  const digits = ncf.replace(/\D/g, '');
+  if (digits.length === 0) return '';
+  return digits.slice(-4).padStart(4, '0');
+}
+
 export const CSVInvoiceImporter = ({ products, clients, onImport, onBulkImport }: CSVInvoiceImporterProps) => {
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState<ImportedInvoice[] | null>(null);
@@ -77,16 +146,49 @@ export const CSVInvoiceImporter = ({ products, clients, onImport, onBulkImport }
   };
 
   const parseCSV = (text: string): ImportedInvoice[] | null => {
-    const lines = text.trim().split('\n');
-    if (lines.length < 2) {
+    // Normalize line endings and split
+    const rawLines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim().split('\n');
+    
+    if (rawLines.length < 2) {
       toast.error('El archivo CSV debe tener al menos una fila de datos');
       return null;
     }
 
-    // Skip header
-    const dataLines = lines.slice(1);
+    // Process all lines, filtering out empty lines and header rows
+    const dataLines: { parts: string[]; lineNumber: number }[] = [];
+    let firstHeaderFound = false;
     
-    // Group lines by NCF
+    for (let i = 0; i < rawLines.length; i++) {
+      const line = rawLines[i].trim();
+      if (!line) continue; // Skip empty lines
+      
+      const parts = line.split(',').map(p => p.trim());
+      
+      // Skip header rows (including repeated ones in the middle)
+      if (isHeaderRow(parts)) {
+        firstHeaderFound = true;
+        continue;
+      }
+      
+      // Skip if we haven't found any header yet and this doesn't look like data
+      if (!firstHeaderFound && i === 0) {
+        // Assume first row is header if it exists
+        firstHeaderFound = true;
+        continue;
+      }
+      
+      // Only include rows with enough columns
+      if (parts.length >= 6) {
+        dataLines.push({ parts, lineNumber: i + 1 });
+      }
+    }
+
+    if (dataLines.length === 0) {
+      toast.error('No se encontraron datos válidos en el archivo');
+      return null;
+    }
+
+    // Group lines by NCF suffix
     const invoiceMap = new Map<string, {
       ncfSuffix: string;
       invoiceDate: Date;
@@ -96,39 +198,43 @@ export const CSVInvoiceImporter = ({ products, clients, onImport, onBulkImport }
       errors: string[];
     }>();
 
-    dataLines.forEach((line, index) => {
-      const parts = line.split(',').map(p => p.trim());
+    for (const { parts, lineNumber } of dataLines) {
+      const [ncfRaw, fechaRaw, clienteRaw, productoRaw, cantidadRaw, precioRaw] = parts;
       
-      if (parts.length < 6) {
-        return;
+      // Normalize NCF
+      const ncfSuffix = normalizeNCF(ncfRaw);
+      if (!ncfSuffix) {
+        continue; // Skip rows without valid NCF
       }
 
-      const [ncf, fecha, cliente, producto, cantidad, precio] = parts;
-      const ncfSuffix = ncf.replace(/\D/g, '').slice(-4).padStart(4, '0');
-      
+      // Parse product data first (required for every row)
+      const cantidad = cleanNumber(cantidadRaw);
+      const precio = cleanNumber(precioRaw);
+      const producto = productoRaw.trim();
+
+      if (!producto) {
+        continue; // Skip rows without product name
+      }
+
+      // Create or get invoice entry
       if (!invoiceMap.has(ncfSuffix)) {
         // Parse date
-        let invoiceDate = new Date();
-        const parsedDate = parse(fecha, 'yyyy-MM-dd', new Date());
-        if (!isNaN(parsedDate.getTime())) {
-          invoiceDate = parsedDate;
-        } else {
-          const parsedDate2 = parse(fecha, 'dd/MM/yyyy', new Date());
-          if (!isNaN(parsedDate2.getTime())) {
-            invoiceDate = parsedDate2;
-          }
-        }
-
+        const invoiceDate = parseDate(fechaRaw) || new Date();
+        
         // Match client
-        const matchedClient = clients.find(c => 
-          c.name.toLowerCase().includes(cliente.toLowerCase()) ||
-          cliente.toLowerCase().includes(c.name.toLowerCase())
-        );
+        const clientName = clienteRaw.trim();
+        const matchedClient = clients.find(c => {
+          const clientLower = c.name.toLowerCase();
+          const inputLower = clientName.toLowerCase();
+          return clientLower === inputLower || 
+                 clientLower.includes(inputLower) || 
+                 inputLower.includes(clientLower);
+        });
 
         invoiceMap.set(ncfSuffix, {
           ncfSuffix,
           invoiceDate,
-          clientName: cliente,
+          clientName,
           clientId: matchedClient?.id,
           lines: [],
           errors: []
@@ -137,43 +243,47 @@ export const CSVInvoiceImporter = ({ products, clients, onImport, onBulkImport }
 
       const invoice = invoiceMap.get(ncfSuffix)!;
 
-      // Parse product line
-      const qty = parseFloat(cantidad);
-      const price = parseFloat(precio);
-
-      if (isNaN(qty) || qty <= 0) {
-        invoice.errors.push(`Línea ${index + 2}: Cantidad inválida "${cantidad}"`);
-        return;
+      // Validate quantity
+      if (cantidad <= 0) {
+        invoice.errors.push(`Línea ${lineNumber}: Cantidad inválida "${cantidadRaw}"`);
+        continue;
       }
 
-      if (isNaN(price) || price <= 0) {
-        invoice.errors.push(`Línea ${index + 2}: Precio inválido "${precio}"`);
-        return;
+      // Validate price
+      if (precio <= 0) {
+        invoice.errors.push(`Línea ${lineNumber}: Precio inválido "${precioRaw}"`);
+        continue;
       }
 
       // Match product
-      const matchedProduct = products.find(p =>
-        p.name.toLowerCase().includes(producto.toLowerCase()) ||
-        producto.toLowerCase().includes(p.name.toLowerCase())
-      );
+      const matchedProduct = products.find(p => {
+        const prodLower = p.name.toLowerCase();
+        const inputLower = producto.toLowerCase();
+        return prodLower === inputLower || 
+               prodLower.includes(inputLower) || 
+               inputLower.includes(prodLower);
+      });
 
       invoice.lines.push({
         productName: producto,
-        quantity: qty,
-        unitPrice: price,
+        quantity: cantidad,
+        unitPrice: precio,
         productId: matchedProduct?.id,
-        error: matchedProduct ? undefined : 'Producto no encontrado'
+        error: matchedProduct ? undefined : 'Producto no encontrado en catálogo'
       });
-    });
+    }
 
     // Convert to array and calculate totals
-    const invoices: ImportedInvoice[] = Array.from(invoiceMap.values()).map(inv => ({
-      ...inv,
-      total: inv.lines.reduce((sum, l) => sum + (l.quantity * l.unitPrice), 0)
-    }));
+    const invoices: ImportedInvoice[] = Array.from(invoiceMap.values())
+      .filter(inv => inv.lines.length > 0) // Only include invoices with products
+      .map(inv => ({
+        ...inv,
+        total: inv.lines.reduce((sum, l) => sum + (l.quantity * l.unitPrice), 0)
+      }))
+      .sort((a, b) => a.ncfSuffix.localeCompare(b.ncfSuffix)); // Sort by NCF
 
     if (invoices.length === 0) {
-      toast.error('No se encontraron facturas válidas en el archivo');
+      toast.error('No se encontraron facturas válidas. Verifica el formato del archivo.');
       return null;
     }
 
@@ -207,59 +317,9 @@ export const CSVInvoiceImporter = ({ products, clients, onImport, onBulkImport }
 
     setImporting(true);
 
-    // If only one invoice, use single import
-    if (preview.length === 1) {
-      const inv = preview[0];
-      const validLines = inv.lines
-        .filter(l => l.productId)
-        .map(l => ({
-          productId: l.productId!,
-          quantity: l.quantity,
-          unitPrice: l.unitPrice
-        }));
-
-      if (validLines.length === 0) {
-        toast.error('No hay productos válidos para importar');
-        setImporting(false);
-        return;
-      }
-
-      onImport({
-        ncfSuffix: inv.ncfSuffix,
-        invoiceDate: inv.invoiceDate,
-        clientId: inv.clientId,
-        lines: validLines
-      });
-
-      toast.success(`Factura importada con ${validLines.length} productos`);
-    } else {
-      // Multiple invoices - use bulk import if available
-      if (onBulkImport) {
-        const invoicesToImport = preview
-          .filter(inv => inv.lines.some(l => l.productId))
-          .map(inv => ({
-            ncfSuffix: inv.ncfSuffix,
-            invoiceDate: inv.invoiceDate,
-            clientId: inv.clientId,
-            lines: inv.lines
-              .filter(l => l.productId)
-              .map(l => ({
-                productId: l.productId!,
-                quantity: l.quantity,
-                unitPrice: l.unitPrice
-              }))
-          }));
-
-        if (invoicesToImport.length === 0) {
-          toast.error('No hay facturas válidas para importar');
-          setImporting(false);
-          return;
-        }
-
-        await onBulkImport(invoicesToImport);
-        toast.success(`${invoicesToImport.length} facturas importadas correctamente`);
-      } else {
-        // Fall back to importing first invoice only
+    try {
+      // If only one invoice, use single import
+      if (preview.length === 1) {
         const inv = preview[0];
         const validLines = inv.lines
           .filter(l => l.productId)
@@ -269,6 +329,12 @@ export const CSVInvoiceImporter = ({ products, clients, onImport, onBulkImport }
             unitPrice: l.unitPrice
           }));
 
+        if (validLines.length === 0) {
+          toast.error('No hay productos válidos para importar');
+          setImporting(false);
+          return;
+        }
+
         onImport({
           ncfSuffix: inv.ncfSuffix,
           invoiceDate: inv.invoiceDate,
@@ -276,14 +342,64 @@ export const CSVInvoiceImporter = ({ products, clients, onImport, onBulkImport }
           lines: validLines
         });
 
-        toast.success(`Primera factura importada (${preview.length - 1} pendientes)`);
-      }
-    }
+        toast.success(`Factura B010000${inv.ncfSuffix} importada con ${validLines.length} productos`);
+      } else {
+        // Multiple invoices - use bulk import if available
+        if (onBulkImport) {
+          const invoicesToImport = preview
+            .filter(inv => inv.lines.some(l => l.productId))
+            .map(inv => ({
+              ncfSuffix: inv.ncfSuffix,
+              invoiceDate: inv.invoiceDate,
+              clientId: inv.clientId,
+              lines: inv.lines
+                .filter(l => l.productId)
+                .map(l => ({
+                  productId: l.productId!,
+                  quantity: l.quantity,
+                  unitPrice: l.unitPrice
+                }))
+            }));
 
-    setImporting(false);
-    setOpen(false);
-    setPreview(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+          if (invoicesToImport.length === 0) {
+            toast.error('No hay facturas válidas para importar');
+            setImporting(false);
+            return;
+          }
+
+          await onBulkImport(invoicesToImport);
+          toast.success(`${invoicesToImport.length} facturas importadas correctamente`);
+        } else {
+          // Fall back to importing first invoice only
+          const inv = preview[0];
+          const validLines = inv.lines
+            .filter(l => l.productId)
+            .map(l => ({
+              productId: l.productId!,
+              quantity: l.quantity,
+              unitPrice: l.unitPrice
+            }));
+
+          onImport({
+            ncfSuffix: inv.ncfSuffix,
+            invoiceDate: inv.invoiceDate,
+            clientId: inv.clientId,
+            lines: validLines
+          });
+
+          toast.success(`Primera factura importada (${preview.length - 1} pendientes)`);
+        }
+      }
+
+      setOpen(false);
+      setPreview(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (error) {
+      toast.error('Error al importar facturas');
+      console.error('Import error:', error);
+    } finally {
+      setImporting(false);
+    }
   };
 
   const resetImport = () => {
@@ -292,6 +408,7 @@ export const CSVInvoiceImporter = ({ products, clients, onImport, onBulkImport }
   };
 
   const totalValidProducts = preview?.reduce((sum, inv) => sum + inv.lines.filter(l => l.productId).length, 0) || 0;
+  const totalInvalidProducts = preview?.reduce((sum, inv) => sum + inv.lines.filter(l => !l.productId).length, 0) || 0;
   const totalInvoices = preview?.length || 0;
 
   return (
@@ -318,12 +435,23 @@ export const CSVInvoiceImporter = ({ products, clients, onImport, onBulkImport }
           <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-dashed">
             <div>
               <p className="text-sm font-medium">Template CSV</p>
-              <p className="text-xs text-muted-foreground">Formato para múltiples facturas</p>
+              <p className="text-xs text-muted-foreground">Formato: NCF_SUFFIX, FECHA, CLIENTE, PRODUCTO, CANTIDAD, PRECIO</p>
             </div>
             <Button variant="outline" size="sm" onClick={downloadTemplate} className="gap-2">
               <Download className="h-4 w-4" />
               Descargar
             </Button>
+          </div>
+
+          {/* Instructions */}
+          <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg text-xs space-y-1">
+            <p className="font-semibold text-blue-700 dark:text-blue-400">Instrucciones:</p>
+            <ul className="list-disc list-inside text-blue-600 dark:text-blue-300 space-y-0.5">
+              <li>Cada fila representa un producto de una factura</li>
+              <li>Las filas con el mismo NCF se agrupan en una sola factura</li>
+              <li>Los encabezados repetidos se ignoran automáticamente</li>
+              <li>Formatos de fecha soportados: YYYY-MM-DD, DD/MM/YYYY, MM/DD/YYYY</li>
+            </ul>
           </div>
 
           {/* File input */}
@@ -332,20 +460,28 @@ export const CSVInvoiceImporter = ({ products, clients, onImport, onBulkImport }
               htmlFor="csv-file" 
               className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted/20 hover:bg-muted/40 transition-colors"
             >
-              <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">
-                  <span className="font-semibold">Haz clic para subir</span> o arrastra un archivo
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">Archivo CSV</p>
-              </div>
+              {loading ? (
+                <div className="flex flex-col items-center gap-2">
+                  <Loader2 className="h-8 w-8 text-muted-foreground animate-spin" />
+                  <p className="text-sm text-muted-foreground">Procesando archivo...</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                  <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-semibold">Haz clic para subir</span> o arrastra un archivo
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">Archivo CSV</p>
+                </div>
+              )}
               <input 
                 id="csv-file" 
                 ref={fileInputRef}
                 type="file" 
-                accept=".csv" 
+                accept=".csv,.txt" 
                 className="hidden" 
                 onChange={handleFileChange}
+                disabled={loading}
               />
             </label>
           </div>
@@ -361,7 +497,10 @@ export const CSVInvoiceImporter = ({ products, clients, onImport, onBulkImport }
                       {totalInvoices} factura{totalInvoices > 1 ? 's' : ''} detectada{totalInvoices > 1 ? 's' : ''}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {totalValidProducts} productos válidos en total
+                      {totalValidProducts} productos válidos
+                      {totalInvalidProducts > 0 && (
+                        <span className="text-amber-600"> • {totalInvalidProducts} sin match</span>
+                      )}
                     </p>
                   </div>
                   <div className="text-right">
@@ -409,7 +548,7 @@ export const CSVInvoiceImporter = ({ products, clients, onImport, onBulkImport }
                               : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
                           }`}
                         >
-                          {line.productName} ({line.quantity})
+                          {line.productName} ({line.quantity} × ${formatNumber(line.unitPrice)})
                         </span>
                       ))}
                     </div>
