@@ -9,6 +9,7 @@ import { SaveSuccessAnimation } from "@/components/SaveSuccessAnimation";
 import { InvoicePreviewDialog } from "@/components/InvoicePreviewDialog";
 import { InvoiceLineItem } from "@/components/InvoiceLineItem";
 import { CSVInvoiceImporter } from "@/components/CSVInvoiceImporter";
+import { ProductCSVImporter } from "@/components/ProductCSVImporter";
 import { formatNumber, formatCurrency } from "@/lib/formatters";
 import { format } from "date-fns";
 import { es } from 'date-fns/locale';
@@ -67,6 +68,7 @@ interface CalculatorViewProps {
   onDeleteProduct: (id: string) => void;
   onSaveInvoice: (ncf: string, invoiceDate: string, products: { name: string; amount: number; percentage: number; commission: number }[], totalAmount: number, totalCommission: number, clientId?: string) => Promise<any>;
   onBulkImport?: (invoices: { ncfSuffix: string; invoiceDate: Date; clientId?: string; lines: { productId: string; quantity: number; unitPrice: number }[] }[]) => Promise<void>;
+  onBulkAddProducts?: (products: { name: string; percentage: number }[]) => Promise<void>;
   suggestedNcf?: number | null;
   lastInvoice?: Invoice;
   clients: Client[];
@@ -88,6 +90,7 @@ export const CalculatorView = ({
   onDeleteProduct,
   onSaveInvoice,
   onBulkImport,
+  onBulkAddProducts,
   suggestedNcf,
   clients,
   onAddClient,
@@ -305,6 +308,12 @@ export const CalculatorView = ({
                   onDeleteProduct={onDeleteProduct}
                   onAddProduct={onAddProduct}
                 />
+                {onBulkAddProducts && (
+                  <ProductCSVImporter 
+                    existingProducts={products.map(p => p.name)}
+                    onBulkImport={onBulkAddProducts}
+                  />
+                )}
               </div>
             </div>
           </div>
