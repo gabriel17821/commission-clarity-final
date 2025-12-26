@@ -46,6 +46,7 @@ export const ProductCatalogDialog = ({
   const [newPercentage, setNewPercentage] = useState('15');
   const [newCategory, setNewCategory] = useState('');
   const [newCustomCategory, setNewCustomCategory] = useState('');
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [showCustomCategoryInput, setShowCustomCategoryInput] = useState(false);
   const [loading, setLoading] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
@@ -56,11 +57,21 @@ export const ProductCatalogDialog = ({
   // Get all unique categories from products (including custom ones)
   const allCategories = useMemo(() => {
     const productCategories = products
-      .map(p => p.category)
+      .map((p) => p.category)
       .filter((c): c is string => !!c);
-    const uniqueCategories = [...new Set([...DEFAULT_CATEGORIES, ...productCategories])];
+
+    const uniqueCategories = [
+      ...new Set([
+        ...DEFAULT_CATEGORIES,
+        ...productCategories,
+        ...customCategories,
+        newCategory.trim(),
+        editCategory.trim(),
+      ].filter(Boolean)),
+    ];
+
     return uniqueCategories.sort();
-  }, [products]);
+  }, [products, customCategories, newCategory, editCategory]);
 
   // Group products by category
   const groupedProducts = useMemo(() => {
@@ -102,19 +113,23 @@ export const ProductCatalogDialog = ({
   };
 
   const handleAddCustomCategory = () => {
-    if (newCustomCategory.trim()) {
-      setNewCategory(newCustomCategory.trim());
-      setNewCustomCategory('');
-      setShowCustomCategoryInput(false);
-    }
+    const next = newCustomCategory.trim();
+    if (!next) return;
+
+    setCustomCategories((prev) => (prev.includes(next) ? prev : [...prev, next]));
+    setNewCategory(next);
+    setNewCustomCategory('');
+    setShowCustomCategoryInput(false);
   };
 
   const handleAddEditCustomCategory = () => {
-    if (editCustomCategory.trim()) {
-      setEditCategory(editCustomCategory.trim());
-      setEditCustomCategory('');
-      setShowEditCategoryInput(false);
-    }
+    const next = editCustomCategory.trim();
+    if (!next) return;
+
+    setCustomCategories((prev) => (prev.includes(next) ? prev : [...prev, next]));
+    setEditCategory(next);
+    setEditCustomCategory('');
+    setShowEditCategoryInput(false);
   };
 
   const handleAdd = async (e: React.FormEvent) => {
