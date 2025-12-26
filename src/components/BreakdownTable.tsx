@@ -68,24 +68,12 @@ export const BreakdownTable = ({
         
         {/* Special Products */}
         {activeProducts.map((item, idx) => {
-          const contrastColors = [
-            { bg: 'bg-indigo-500', text: 'text-indigo-600 dark:text-indigo-400' },
-            { bg: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400' },
-            { bg: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-500' },
-            { bg: 'bg-rose-500', text: 'text-rose-600 dark:text-rose-400' },
-            { bg: 'bg-cyan-500', text: 'text-cyan-600 dark:text-cyan-400' },
-            { bg: 'bg-violet-500', text: 'text-violet-600 dark:text-violet-400' },
-            { bg: 'bg-orange-500', text: 'text-orange-600 dark:text-orange-400' },
-            { bg: 'bg-teal-500', text: 'text-teal-600 dark:text-teal-400' },
-          ];
-          const colorSet = contrastColors[idx % contrastColors.length];
           const hasOffer = item.quantityFree && item.quantityFree > 0;
           const displayAmount = item.netAmount ?? item.amount;
           
           return (
             <div key={idx} className="grid grid-cols-4 text-sm">
               <div className="px-4 py-3 flex items-center gap-2">
-                <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${colorSet.bg}`} />
                 <span className="text-foreground font-medium truncate">{item.label}</span>
                 {hasOffer && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 font-medium">
@@ -104,7 +92,7 @@ export const BreakdownTable = ({
                   <span>{item.quantitySold} × ${formatNumber(item.unitPrice)}</span>
                 )}
               </div>
-              <div className={`px-4 py-3 text-right font-mono font-semibold ${colorSet.text}`}>
+              <div className="px-4 py-3 text-right font-mono font-semibold text-foreground">
                 +${formatCurrency(item.commission)}
                 <span className="text-muted-foreground text-xs ml-1">({item.percentage}%)</span>
               </div>
