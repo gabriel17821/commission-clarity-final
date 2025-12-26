@@ -293,12 +293,12 @@ export function ClientCatalogDialog({
                               </div>
                               <div className="space-y-1">
                                 <Label className="text-xs">Provincia</Label>
-                                <Select value={editProvince} onValueChange={setEditProvince}>
+                                <Select value={editProvince || "__none__"} onValueChange={(val) => setEditProvince(val === "__none__" ? "" : val)}>
                                   <SelectTrigger className="h-8 text-sm">
                                     <SelectValue placeholder="Sin provincia" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="">Sin provincia</SelectItem>
+                                    <SelectItem value="__none__">Sin provincia</SelectItem>
                                     {PROVINCE_OPTIONS.map(prov => (
                                       <SelectItem key={prov} value={prov}>{prov}</SelectItem>
                                     ))}
