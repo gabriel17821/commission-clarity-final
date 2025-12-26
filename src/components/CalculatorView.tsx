@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { RotateCcw, Calculator, Package, CalendarIcon, FileText, User, Save, RefreshCw, DollarSign, Plus, Search, X, Settings, BookOpen } from "lucide-react";
+import { RotateCcw, Calculator, Package, CalendarIcon, FileText, User, Save, RefreshCw, DollarSign, Plus, Search, X, Settings, BookOpen, Gift } from "lucide-react";
 import { ProductCatalogDialog } from "@/components/ProductCatalogDialog";
 import { BreakdownTable } from "@/components/BreakdownTable";
 import { ClientSearchSelect } from "@/components/ClientSearchSelect";
@@ -35,15 +35,19 @@ interface ProductLineData {
   productId: string;
   quantity: number;
   unitPrice: number;
+  isOffer: boolean;
 }
 
 interface Breakdown {
   name: string;
   label: string;
   amount: number;
+  grossAmount: number;
+  netAmount: number;
   percentage: number;
   commission: number;
   color: string;
+  isOffer: boolean;
 }
 
 interface Calculations {
@@ -51,6 +55,12 @@ interface Calculations {
   restAmount: number;
   restCommission: number;
   totalCommission: number;
+  specialProductsTotal?: number;
+  invoiceTotal?: number;
+  grossTotal?: number;
+  netTotal?: number;
+  totalOfferItems?: number;
+  totalOfferValue?: number;
 }
 
 interface CalculatorViewProps {
@@ -132,31 +142,58 @@ export const CalculatorView = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Calculate totals from product lines (sin resto)
+  // Calculate totals from product lines with offer support
   const calculations = useMemo(() => {
     const breakdown: Breakdown[] = [];
-    let invoiceTotal = 0;
+    let grossTotal = 0;
+    let netTotal = 0;
+    let totalOfferItems = 0;
+    let totalOfferValue = 0;
 
     productLines.forEach(line => {
       const product = products.find(p => p.id === line.productId);
-      if (product && line.quantity > 0 && line.unitPrice > 0) {
-        const lineTotal = line.quantity * line.unitPrice;
-        const commission = lineTotal * (product.percentage / 100);
+      if (product && line.quantity > 0) {
+        const grossAmount = line.quantity * line.unitPrice;
+        // If offer, net is 0
+        const netAmount = line.isOffer ? 0 : grossAmount;
+        const commission = netAmount * (product.percentage / 100);
+        
         breakdown.push({
           name: product.name,
           label: product.name,
-          amount: lineTotal,
+          amount: netAmount,
+          grossAmount,
+          netAmount,
           percentage: product.percentage,
           commission,
           color: product.color,
+          isOffer: line.isOffer,
         });
-        invoiceTotal += lineTotal;
+        
+        grossTotal += grossAmount;
+        netTotal += netAmount;
+        
+        if (line.isOffer) {
+          totalOfferItems += line.quantity;
+          totalOfferValue += grossAmount;
+        }
       }
     });
 
     const totalCommission = breakdown.reduce((sum, item) => sum + item.commission, 0);
 
-    return { breakdown, restAmount: 0, restCommission: 0, totalCommission, specialProductsTotal: invoiceTotal, invoiceTotal };
+    return { 
+      breakdown, 
+      restAmount: 0, 
+      restCommission: 0, 
+      totalCommission, 
+      specialProductsTotal: netTotal, 
+      invoiceTotal: netTotal,
+      grossTotal,
+      netTotal,
+      totalOfferItems,
+      totalOfferValue,
+    };
   }, [productLines, products]);
 
   const activeProductIds = productLines.map(l => l.productId);
@@ -166,10 +203,11 @@ export const CalculatorView = ({
   );
 
   const handleAddLine = (productId: string) => {
-    setProductLines(prev => [...prev, { productId, quantity: 0, unitPrice: 0 }]);
+    setProductLines(prev => [...prev, { productId, quantity: 0, unitPrice: 0, isOffer: false }]);
     setSearchTerm('');
     setShowSearch(false);
     toast.success("Producto agregado");
+  };
   };
 
   const handleRemoveLine = (productId: string) => {
@@ -198,8 +236,22 @@ export const CalculatorView = ({
       );
       // Update external productAmounts
       const line = updated.find(l => l.productId === productId);
-      if (line) {
+      if (line && !line.isOffer) {
         onProductChange(productId, line.quantity * unitPrice);
+      }
+      return updated;
+    });
+  };
+
+  const handleOfferChange = (productId: string, isOffer: boolean) => {
+    setProductLines(prev => {
+      const updated = prev.map(l => 
+        l.productId === productId ? { ...l, isOffer } : l
+      );
+      // If marked as offer, net amount is 0
+      const line = updated.find(l => l.productId === productId);
+      if (line) {
+        onProductChange(productId, isOffer ? 0 : line.quantity * line.unitPrice);
       }
       return updated;
     });
@@ -306,7 +358,8 @@ export const CalculatorView = ({
                     setProductLines(data.lines.map(l => ({
                       productId: l.productId,
                       quantity: l.quantity,
-                      unitPrice: l.unitPrice
+                      unitPrice: l.unitPrice,
+                      isOffer: l.isOffer || false
                     })));
                   }}
                   onBulkImport={onBulkImport}
@@ -437,11 +490,14 @@ export const CalculatorView = ({
           {/* Product Lines Header */}
           <div className="px-4 py-3 border-b border-border bg-muted/20">
             <div className="grid grid-cols-12 gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              <div className="col-span-4">Producto</div>
+              <div className="col-span-3">Producto</div>
               <div className="col-span-2 text-center">Cantidad</div>
-              <div className="col-span-2 text-center">Precio Unit.</div>
+              <div className="col-span-2 text-center">Precio</div>
               <div className="col-span-2 text-right">Total</div>
-              <div className="col-span-2"></div>
+              <div className="col-span-3 text-center flex items-center justify-center gap-1">
+                <Gift className="h-3 w-3 text-amber-600" />
+                <span>Oferta</span>
+              </div>
             </div>
           </div>
 
@@ -462,8 +518,10 @@ export const CalculatorView = ({
                       percentage={product.percentage}
                       quantity={line.quantity}
                       unitPrice={line.unitPrice}
+                      isOffer={line.isOffer}
                       onQuantityChange={(q) => handleQuantityChange(line.productId, q)}
                       onUnitPriceChange={(p) => handleUnitPriceChange(line.productId, p)}
+                      onOfferChange={(o) => handleOfferChange(line.productId, o)}
                       onRemove={() => handleRemoveLine(line.productId)}
                     />
                   );

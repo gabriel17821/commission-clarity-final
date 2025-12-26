@@ -48,9 +48,12 @@ const Index = () => {
       name: product.name,
       label: product.name,
       amount: productAmounts[product.id] || 0,
+      grossAmount: productAmounts[product.id] || 0,
+      netAmount: productAmounts[product.id] || 0,
       percentage: product.percentage,
       commission: (productAmounts[product.id] || 0) * (product.percentage / 100),
       color: product.color,
+      isOffer: false,
     }));
 
     const specialProductsTotal = Object.values(productAmounts).reduce(

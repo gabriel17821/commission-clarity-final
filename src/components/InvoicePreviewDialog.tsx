@@ -3,15 +3,19 @@ import { Button } from '@/components/ui/button';
 import { formatCurrency, formatNumber } from '@/lib/formatters';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ArrowLeft, Check, Save } from 'lucide-react';
+import { ArrowLeft, Check, Save, Gift } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface Breakdown {
   name: string;
   label: string;
   amount: number;
+  grossAmount?: number;
+  netAmount?: number;
   percentage: number;
   commission: number;
   color: string;
+  isOffer?: boolean;
 }
 
 interface InvoicePreviewDialogProps {
@@ -39,8 +43,8 @@ export const InvoicePreviewDialog = ({
   loading,
   data,
 }: InvoicePreviewDialogProps) => {
-  // CORRECCIÓN: Filtrar solo los productos que tienen un monto mayor a 0
-  const activeProducts = data.breakdown.filter(item => item.amount > 0);
+  // Filter products with amount > 0
+  const activeProducts = data.breakdown.filter(item => (item.amount > 0) || (item.isOffer && item.grossAmount && item.grossAmount > 0));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
