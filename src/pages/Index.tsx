@@ -15,10 +15,11 @@ import { MonthlyBreakdown } from "@/components/MonthlyBreakdown";
 import { SellerManager } from "@/components/SellerManager";
 import { SettingsPage } from "@/components/SettingsPage";
 import { VisitPrepDashboard } from "@/components/analytics/VisitPrepDashboard";
+import { ClientCatalogDialog } from "@/components/ClientCatalogDialog";
 const Index = () => {
   const { products, loading: productsLoading, addProduct, updateProduct, deleteProduct, bulkAddProducts } = useProducts();
   const { restPercentage, loading: settingsLoading, updateRestPercentage, getNextNcfNumber, updateLastNcfNumber } = useSettings();
-  const { clients, loading: clientsLoading, addClient, deleteClient, refetch: refetchClients } = useClients();
+  const { clients, loading: clientsLoading, addClient, updateClient, deleteClient, refetch: refetchClients } = useClients();
   const { sellers, activeSeller, setActiveSeller, addSeller, updateSeller, deleteSeller, setDefaultSeller } = useSellers();
   
   // Invoices filtradas por el vendedor activo
@@ -28,6 +29,7 @@ const Index = () => {
   const [totalInvoice, setTotalInvoice] = useState(0);
   const [productAmounts, setProductAmounts] = useState<Record<string, number>>({});
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [clientCatalogOpen, setClientCatalogOpen] = useState(false);
 
   useEffect(() => {
     if (products.length > 0) {
@@ -292,6 +294,16 @@ const Index = () => {
         onUpdateProduct={updateProduct}
         onDeleteProduct={deleteProduct}
         onBulkAddProducts={bulkAddProducts}
+        onOpenClientCatalog={() => setClientCatalogOpen(true)}
+      />
+
+      <ClientCatalogDialog
+        open={clientCatalogOpen}
+        onOpenChange={setClientCatalogOpen}
+        clients={clients}
+        onAddClient={addClient}
+        onUpdateClient={updateClient}
+        onDeleteClient={deleteClient}
       />
     </div>
   );

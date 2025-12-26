@@ -38,14 +38,14 @@ export const useClients = () => {
     fetchClients();
   }, []);
 
-  const addClient = async (name: string, phone?: string, email?: string, address?: string, notes?: string): Promise<Client | null> => {
+  const addClient = async (name: string, phone?: string, email?: string, address?: string, notes?: string, province?: string): Promise<Client | null> => {
     try {
       // Always save names in UPPERCASE for consistent matching
       const normalizedName = name.toUpperCase().trim();
       
       const { data, error } = await supabase
         .from('clients')
-        .insert([{ name: normalizedName, phone, email, address, notes }])
+        .insert([{ name: normalizedName, phone, email, address, notes, province }])
         .select()
         .single();
 
