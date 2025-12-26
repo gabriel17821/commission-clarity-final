@@ -316,6 +316,15 @@ export const SettingsPage = ({
             </p>
           </Card>
 
+          {/* Match Management */}
+          <Card className="p-4 space-y-3">
+            <MatchManagement 
+              products={products as any}
+              clients={clients}
+              onRefresh={onRefetchClients}
+            />
+          </Card>
+
           {/* Backup & Restore */}
           <Card className="p-4 space-y-3">
             <div className="flex items-center gap-2">
