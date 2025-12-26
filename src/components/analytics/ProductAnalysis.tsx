@@ -1,14 +1,16 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  PieChart, Pie, Cell, Legend, ComposedChart, Line
+  Cell
 } from 'recharts';
 import { 
-  TrendingUp, TrendingDown, DollarSign, Package, Award, AlertTriangle,
-  ArrowUpRight, ArrowDownRight, Minus, ShoppingBag, Target, BarChart3
+  TrendingUp, TrendingDown, DollarSign, Package, 
+  ArrowUpRight, ArrowDownRight, Minus, ShoppingBag, ChevronDown, ChevronUp, Table
 } from 'lucide-react';
-import { parseISO, isWithinInterval, subMonths, startOfMonth, endOfMonth, differenceInDays } from 'date-fns';
+import { parseISO, isWithinInterval, differenceInDays, format } from 'date-fns';
 import { Invoice } from '@/hooks/useInvoices';
 import { Product } from '@/hooks/useProducts';
 import { formatNumber } from '@/lib/formatters';
@@ -28,11 +30,16 @@ interface ProductMetric {
   trendPercent: number;
   status: 'high' | 'medium' | 'low';
   color: string;
+  previousQuantity: number;
+  previousRevenue: number;
 }
 
-const COLORS = ['hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+const CHART_COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#84cc16'];
 
 export function ProductAnalysis({ invoices, products, dateRange }: ProductAnalysisProps) {
+  const [showAllProducts, setShowAllProducts] = useState(false);
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
+
   const analysis = useMemo(() => {
     // Filter invoices by date range
     const filteredInvoices = invoices.filter(inv => {
@@ -78,11 +85,14 @@ export function ProductAnalysis({ invoices, products, dateRange }: ProductAnalys
 
     const totalRevenue = Array.from(productData.values()).reduce((sum, p) => sum + p.revenue, 0);
     const totalQuantity = Array.from(productData.values()).reduce((sum, p) => sum + p.quantity, 0);
+    const prevTotalRevenue = Array.from(previousProductData.values()).reduce((sum, p) => sum + p.revenue, 0);
+    const prevTotalQuantity = Array.from(previousProductData.values()).reduce((sum, p) => sum + p.quantity, 0);
 
     // Build metrics
     const metrics: ProductMetric[] = Array.from(productData.entries()).map(([name, data]) => {
       const prevData = previousProductData.get(name);
       const prevRevenue = prevData?.revenue || 0;
+      const prevQuantity = prevData?.quantity || 0;
       
       let trend: 'up' | 'down' | 'stable' = 'stable';
       let trendPercent = 0;
@@ -112,7 +122,9 @@ export function ProductAnalysis({ invoices, products, dateRange }: ProductAnalys
         trend,
         trendPercent,
         status,
-        color: data.color
+        color: data.color,
+        previousQuantity: prevQuantity,
+        previousRevenue: prevRevenue
       };
     });
 
@@ -125,33 +137,30 @@ export function ProductAnalysis({ invoices, products, dateRange }: ProductAnalys
     const growing = metrics.filter(p => p.trend === 'up');
     const declining = metrics.filter(p => p.trend === 'down');
 
-    // Chart data - top 10
-    const chartData = metrics.slice(0, 10).map(m => ({
-      name: m.name.length > 15 ? m.name.substring(0, 15) + '...' : m.name,
+    // Chart data - top 8
+    const chartData = metrics.slice(0, 8).map((m, i) => ({
+      name: m.name.length > 12 ? m.name.substring(0, 12) + '...' : m.name,
       fullName: m.name,
       quantity: m.quantity,
       revenue: m.revenue,
-      color: m.color
-    }));
-
-    // Pie data for revenue distribution
-    const pieData = metrics.slice(0, 5).map((m, i) => ({
-      name: m.name,
-      value: m.revenue,
-      color: COLORS[i % COLORS.length]
+      prevQuantity: m.previousQuantity,
+      prevRevenue: m.previousRevenue,
+      color: CHART_COLORS[i % CHART_COLORS.length]
     }));
 
     return {
       metrics,
       totalRevenue,
       totalQuantity,
+      prevTotalRevenue,
+      prevTotalQuantity,
       topByRevenue,
       topByQuantity,
       lowestByRevenue,
       growing,
       declining,
       chartData,
-      pieData
+      periodLabel: `${format(dateRange.from, 'dd/MM')} - ${format(dateRange.to, 'dd/MM')}`
     };
   }, [invoices, products, dateRange]);
 
@@ -160,14 +169,14 @@ export function ProductAnalysis({ invoices, products, dateRange }: ProductAnalys
       return (
         <span className="inline-flex items-center gap-0.5 text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 font-medium">
           <ArrowUpRight className="h-3 w-3" />
-          +{percent.toFixed(0)}%
+          +{Math.abs(percent).toFixed(0)}%
         </span>
       );
     } else if (trend === 'down') {
       return (
         <span className="inline-flex items-center gap-0.5 text-xs px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-600 font-medium">
           <ArrowDownRight className="h-3 w-3" />
-          {percent.toFixed(0)}%
+          -{Math.abs(percent).toFixed(0)}%
         </span>
       );
     }
@@ -181,225 +190,287 @@ export function ProductAnalysis({ invoices, products, dateRange }: ProductAnalys
 
   const renderStatusBadge = (status: 'high' | 'medium' | 'low') => {
     if (status === 'high') {
-      return <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600">Alto rendimiento</span>;
+      return <Badge variant="default" className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20">Alto</Badge>;
     } else if (status === 'medium') {
-      return <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600">Medio</span>;
+      return <Badge variant="secondary" className="bg-amber-500/10 text-amber-600">Medio</Badge>;
     }
-    return <span className="text-xs px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-600">Bajo</span>;
+    return <Badge variant="outline" className="text-rose-600">Bajo</Badge>;
   };
+
+  const displayedMetrics = showAllProducts ? analysis.metrics : analysis.metrics.slice(0, 10);
+
+  // Calculate overall trend
+  const overallRevenueTrend = analysis.prevTotalRevenue > 0 
+    ? ((analysis.totalRevenue - analysis.prevTotalRevenue) / analysis.prevTotalRevenue) * 100 
+    : 0;
+  const overallQuantityTrend = analysis.prevTotalQuantity > 0 
+    ? ((analysis.totalQuantity - analysis.prevTotalQuantity) / analysis.prevTotalQuantity) * 100 
+    : 0;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center">
-          <BarChart3 className="h-5 w-5 text-white" />
-        </div>
-        <div>
-          <h3 className="text-xl font-bold">Análisis de Productos</h3>
-          <p className="text-sm text-muted-foreground">Decisiones basadas en datos reales</p>
-        </div>
-      </div>
-
-      {/* Key Insights */}
+      {/* Key Insights Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Most Revenue */}
-        <Card className="border-emerald-500/30 bg-gradient-to-br from-emerald-500/5 to-transparent">
+        {/* Total Revenue */}
+        <Card className="border-emerald-500/30">
           <CardContent className="pt-4">
-            <div className="flex items-center gap-2 mb-2">
-              <DollarSign className="h-4 w-4 text-emerald-600" />
-              <span className="text-xs text-muted-foreground uppercase">Más Dinero</span>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-emerald-600" />
+                <span className="text-xs text-muted-foreground uppercase">Ingreso Total</span>
+              </div>
+              {overallRevenueTrend !== 0 && renderTrendBadge(
+                overallRevenueTrend > 5 ? 'up' : overallRevenueTrend < -5 ? 'down' : 'stable',
+                overallRevenueTrend
+              )}
             </div>
-            <p className="font-semibold truncate">{analysis.topByRevenue?.name || 'N/A'}</p>
-            <p className="text-lg font-bold text-emerald-600">${formatNumber(analysis.topByRevenue?.revenue || 0)}</p>
+            <p className="text-2xl font-bold">${formatNumber(analysis.totalRevenue)}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Anterior: ${formatNumber(analysis.prevTotalRevenue)}
+            </p>
           </CardContent>
         </Card>
 
-        {/* Most Quantity */}
-        <Card className="border-blue-500/30 bg-gradient-to-br from-blue-500/5 to-transparent">
+        {/* Total Quantity */}
+        <Card className="border-blue-500/30">
           <CardContent className="pt-4">
-            <div className="flex items-center gap-2 mb-2">
-              <ShoppingBag className="h-4 w-4 text-blue-600" />
-              <span className="text-xs text-muted-foreground uppercase">Mayor Volumen</span>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <ShoppingBag className="h-4 w-4 text-blue-600" />
+                <span className="text-xs text-muted-foreground uppercase">Unidades</span>
+              </div>
+              {overallQuantityTrend !== 0 && renderTrendBadge(
+                overallQuantityTrend > 5 ? 'up' : overallQuantityTrend < -5 ? 'down' : 'stable',
+                overallQuantityTrend
+              )}
             </div>
-            <p className="font-semibold truncate">{analysis.topByQuantity?.name || 'N/A'}</p>
-            <p className="text-lg font-bold text-blue-600">{analysis.topByQuantity?.quantity || 0} uds</p>
+            <p className="text-2xl font-bold">{analysis.totalQuantity}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Anterior: {analysis.prevTotalQuantity}
+            </p>
           </CardContent>
         </Card>
 
         {/* Growing */}
-        <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
+        <Card className="border-primary/30">
           <CardContent className="pt-4">
             <div className="flex items-center gap-2 mb-2">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              <span className="text-xs text-muted-foreground uppercase">Creciendo</span>
+              <TrendingUp className="h-4 w-4 text-emerald-600" />
+              <span className="text-xs text-muted-foreground uppercase">En Alza</span>
             </div>
-            <p className="text-2xl font-bold">{analysis.growing.length}</p>
-            <p className="text-xs text-muted-foreground">productos en alza</p>
+            <p className="text-2xl font-bold text-emerald-600">{analysis.growing.length}</p>
+            <p className="text-xs text-muted-foreground mt-1">productos creciendo</p>
           </CardContent>
         </Card>
 
         {/* Declining */}
-        <Card className="border-rose-500/30 bg-gradient-to-br from-rose-500/5 to-transparent">
+        <Card className="border-rose-500/30">
           <CardContent className="pt-4">
             <div className="flex items-center gap-2 mb-2">
               <TrendingDown className="h-4 w-4 text-rose-600" />
               <span className="text-xs text-muted-foreground uppercase">Cayendo</span>
             </div>
             <p className="text-2xl font-bold text-rose-600">{analysis.declining.length}</p>
-            <p className="text-xs text-muted-foreground">productos en baja</p>
+            <p className="text-xs text-muted-foreground mt-1">productos en baja</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Charts */}
-      <div className="grid lg:grid-cols-2 gap-4">
-        {/* Quantity Chart */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Package className="h-4 w-4" />
-              Cantidad Vendida por Producto
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={analysis.chartData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                <XAxis type="number" />
-                <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 11 }} />
-                <Tooltip 
-                  content={({ active, payload }) => {
-                    if (active && payload?.[0]) {
-                      const data = payload[0].payload;
-                      return (
-                        <div className="bg-card border rounded-lg p-2 shadow-lg">
-                          <p className="font-semibold text-sm">{data.fullName}</p>
-                          <p className="text-sm">{data.quantity} unidades</p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Bar dataKey="quantity" radius={[0, 4, 4, 0]}>
-                  {analysis.chartData.map((entry, index) => (
-                    <Cell key={index} fill={entry.color} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+      {/* Top/Bottom Products Highlight */}
+      <div className="grid md:grid-cols-3 gap-4">
+        <Card className="bg-gradient-to-br from-emerald-500/5 to-transparent border-emerald-500/30">
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-8 w-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                <DollarSign className="h-4 w-4 text-emerald-600" />
+              </div>
+              <span className="text-sm font-medium">Más Dinero Generó</span>
+            </div>
+            <p className="font-bold text-lg truncate">{analysis.topByRevenue?.name || 'N/A'}</p>
+            <p className="text-2xl font-bold text-emerald-600">${formatNumber(analysis.topByRevenue?.revenue || 0)}</p>
           </CardContent>
         </Card>
 
-        {/* Revenue Chart */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              Ingreso por Producto
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={analysis.chartData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                <XAxis type="number" tickFormatter={(v) => `$${formatNumber(v)}`} />
-                <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 11 }} />
-                <Tooltip 
-                  content={({ active, payload }) => {
-                    if (active && payload?.[0]) {
-                      const data = payload[0].payload;
-                      return (
-                        <div className="bg-card border rounded-lg p-2 shadow-lg">
-                          <p className="font-semibold text-sm">{data.fullName}</p>
-                          <p className="text-sm">${formatNumber(data.revenue)}</p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Bar dataKey="revenue" radius={[0, 4, 4, 0]}>
-                  {analysis.chartData.map((entry, index) => (
-                    <Cell key={index} fill={entry.color} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+        <Card className="bg-gradient-to-br from-blue-500/5 to-transparent border-blue-500/30">
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-8 w-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                <Package className="h-4 w-4 text-blue-600" />
+              </div>
+              <span className="text-sm font-medium">Mayor Volumen</span>
+            </div>
+            <p className="font-bold text-lg truncate">{analysis.topByQuantity?.name || 'N/A'}</p>
+            <p className="text-2xl font-bold text-blue-600">{analysis.topByQuantity?.quantity || 0} uds</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-rose-500/5 to-transparent border-rose-500/30">
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-8 w-8 rounded-lg bg-rose-500/20 flex items-center justify-center">
+                <TrendingDown className="h-4 w-4 text-rose-600" />
+              </div>
+              <span className="text-sm font-medium">Menor Rendimiento</span>
+            </div>
+            <p className="font-bold text-lg truncate">{analysis.lowestByRevenue?.name || 'N/A'}</p>
+            <p className="text-2xl font-bold text-rose-600">${formatNumber(analysis.lowestByRevenue?.revenue || 0)}</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Comparison Chart */}
+      {/* Comparative Chart */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
-            <Target className="h-4 w-4" />
-            Comparativo: Cantidad vs Dinero
+            <Package className="h-4 w-4" />
+            Top 8 Productos - Período Actual vs Anterior
           </CardTitle>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
-            <ComposedChart data={analysis.chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-              <YAxis yAxisId="left" tickFormatter={(v) => `${v}`} />
-              <YAxis yAxisId="right" orientation="right" tickFormatter={(v) => `$${formatNumber(v)}`} />
+            <BarChart data={analysis.chartData} layout="vertical" barGap={0}>
+              <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+              <XAxis type="number" tickFormatter={(v) => `$${formatNumber(v)}`} />
+              <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 11 }} />
               <Tooltip 
                 content={({ active, payload }) => {
                   if (active && payload?.[0]) {
                     const data = payload[0].payload;
                     return (
-                      <div className="bg-card border rounded-lg p-2 shadow-lg">
-                        <p className="font-semibold text-sm">{data.fullName}</p>
-                        <p className="text-sm text-blue-600">{data.quantity} unidades</p>
-                        <p className="text-sm text-emerald-600">${formatNumber(data.revenue)}</p>
+                      <div className="bg-card border rounded-lg p-3 shadow-lg">
+                        <p className="font-semibold text-sm mb-2">{data.fullName}</p>
+                        <div className="space-y-1 text-sm">
+                          <div className="flex justify-between gap-4">
+                            <span className="text-emerald-600">Actual:</span>
+                            <span className="font-medium">${formatNumber(data.revenue)} ({data.quantity} uds)</span>
+                          </div>
+                          <div className="flex justify-between gap-4">
+                            <span className="text-muted-foreground">Anterior:</span>
+                            <span>${formatNumber(data.prevRevenue)} ({data.prevQuantity} uds)</span>
+                          </div>
+                        </div>
                       </div>
                     );
                   }
                   return null;
                 }}
               />
-              <Bar yAxisId="left" dataKey="quantity" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
-              <Line yAxisId="right" type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: 'hsl(var(--primary))' }} />
-            </ComposedChart>
+              <Bar dataKey="prevRevenue" name="Período Anterior" fill="hsl(var(--muted))" radius={[0, 4, 4, 0]} />
+              <Bar dataKey="revenue" name="Período Actual" radius={[0, 4, 4, 0]}>
+                {analysis.chartData.map((entry, index) => (
+                  <Cell key={index} fill={entry.color} />
+                ))}
+              </Bar>
+            </BarChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
 
-      {/* Product Table */}
+      {/* Detailed Table */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Detalle por Producto</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Table className="h-4 w-4" />
+              Tabla Comparativa Detallada
+            </CardTitle>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setViewMode(viewMode === 'table' ? 'cards' : 'table')}
+            >
+              {viewMode === 'table' ? 'Ver Cards' : 'Ver Tabla'}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2 font-medium">Producto</th>
-                  <th className="text-right py-2 font-medium">Cantidad</th>
-                  <th className="text-right py-2 font-medium">Ingreso</th>
-                  <th className="text-right py-2 font-medium">% del Total</th>
-                  <th className="text-right py-2 font-medium">Tendencia</th>
-                  <th className="text-right py-2 font-medium">Estado</th>
+                <tr className="border-b bg-muted/30">
+                  <th className="text-left py-3 px-2 font-semibold">Producto</th>
+                  <th className="text-right py-3 px-2 font-semibold">
+                    <div className="flex flex-col items-end">
+                      <span>Cantidad</span>
+                      <span className="text-xs font-normal text-muted-foreground">Actual / Anterior</span>
+                    </div>
+                  </th>
+                  <th className="text-right py-3 px-2 font-semibold">
+                    <div className="flex flex-col items-end">
+                      <span>Ingreso</span>
+                      <span className="text-xs font-normal text-muted-foreground">Actual / Anterior</span>
+                    </div>
+                  </th>
+                  <th className="text-right py-3 px-2 font-semibold">% Total</th>
+                  <th className="text-center py-3 px-2 font-semibold">Tendencia</th>
+                  <th className="text-center py-3 px-2 font-semibold">Estado</th>
                 </tr>
               </thead>
               <tbody>
-                {analysis.metrics.slice(0, 15).map(metric => (
-                  <tr key={metric.name} className="border-b border-border/50 hover:bg-muted/30">
-                    <td className="py-2 font-medium">{metric.name}</td>
-                    <td className="text-right py-2">{metric.quantity}</td>
-                    <td className="text-right py-2">${formatNumber(metric.revenue)}</td>
-                    <td className="text-right py-2">{metric.percentOfTotal.toFixed(1)}%</td>
-                    <td className="text-right py-2">{renderTrendBadge(metric.trend, metric.trendPercent)}</td>
-                    <td className="text-right py-2">{renderStatusBadge(metric.status)}</td>
+                {displayedMetrics.map((metric, index) => (
+                  <tr 
+                    key={metric.name} 
+                    className={`border-b border-border/50 hover:bg-muted/30 transition-colors ${
+                      index < 3 ? 'bg-emerald-500/5' : ''
+                    }`}
+                  >
+                    <td className="py-3 px-2">
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-2 h-2 rounded-full" 
+                          style={{ backgroundColor: metric.color }}
+                        />
+                        <span className="font-medium">{metric.name}</span>
+                      </div>
+                    </td>
+                    <td className="text-right py-3 px-2">
+                      <div className="flex flex-col items-end">
+                        <span className="font-semibold">{metric.quantity}</span>
+                        <span className="text-xs text-muted-foreground">{metric.previousQuantity}</span>
+                      </div>
+                    </td>
+                    <td className="text-right py-3 px-2">
+                      <div className="flex flex-col items-end">
+                        <span className="font-semibold">${formatNumber(metric.revenue)}</span>
+                        <span className="text-xs text-muted-foreground">${formatNumber(metric.previousRevenue)}</span>
+                      </div>
+                    </td>
+                    <td className="text-right py-3 px-2">
+                      <span className="font-medium">{metric.percentOfTotal.toFixed(1)}%</span>
+                    </td>
+                    <td className="text-center py-3 px-2">
+                      {renderTrendBadge(metric.trend, metric.trendPercent)}
+                    </td>
+                    <td className="text-center py-3 px-2">
+                      {renderStatusBadge(metric.status)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          
+          {analysis.metrics.length > 10 && (
+            <div className="mt-4 text-center">
+              <Button
+                variant="ghost"
+                onClick={() => setShowAllProducts(!showAllProducts)}
+                className="gap-2"
+              >
+                {showAllProducts ? (
+                  <>
+                    <ChevronUp className="h-4 w-4" />
+                    Ver menos
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-4 w-4" />
+                    Ver todos ({analysis.metrics.length} productos)
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

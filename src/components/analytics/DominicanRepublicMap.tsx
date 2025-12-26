@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 import { 
   MapPin, Users, DollarSign, Package, TrendingUp, TrendingDown,
-  ChevronRight, ArrowLeft, AlertTriangle, Calendar
+  ChevronRight, ArrowLeft, AlertTriangle, Eye
 } from 'lucide-react';
 import { parseISO, isWithinInterval, subDays } from 'date-fns';
 import { Invoice } from '@/hooks/useInvoices';
@@ -174,10 +175,15 @@ export function DominicanRepublicMap({
     if (!stat || stat.totalSales === 0) return 'hsl(var(--muted))';
     
     const intensity = Math.min(stat.totalSales / maxSales, 1);
-    // From light to dark primary
-    const lightness = 90 - (intensity * 50);
-    return `hsl(var(--primary) / ${0.2 + intensity * 0.8})`;
+    return `hsl(142, 76%, ${75 - (intensity * 45)}%)`;
   };
+
+  // Get provinces with activity sorted by sales
+  const activeProvinces = useMemo(() => {
+    return Array.from(provinceStats.entries())
+      .filter(([_, stat]) => stat.clientCount > 0)
+      .sort((a, b) => b[1].totalSales - a[1].totalSales);
+  }, [provinceStats]);
 
   const selectedStats = selectedProvince ? provinceStats.get(selectedProvince) : null;
 
@@ -333,158 +339,219 @@ export function DominicanRepublicMap({
   // Map View
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
           <MapPin className="h-5 w-5 text-white" />
         </div>
         <div>
-          <h3 className="text-xl font-bold">Mapa de República Dominicana</h3>
+          <h3 className="text-lg font-bold">Mapa de República Dominicana</h3>
           <p className="text-sm text-muted-foreground">Haz clic en una provincia para ver detalles</p>
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4">
+      <div className="grid lg:grid-cols-3 gap-6">
         {/* Map SVG */}
         <div className="lg:col-span-2">
-          <Card className="p-4">
-            <svg 
-              viewBox="50 50 520 400" 
-              className="w-full h-auto"
-              style={{ maxHeight: '400px' }}
-            >
-              {/* Background */}
-              <rect x="50" y="50" width="520" height="400" fill="hsl(var(--muted) / 0.3)" rx="8" />
-              
-              {/* Provinces */}
-              {PROVINCES.map(province => {
-                const isSelected = selectedProvince === province.name;
-                const isHovered = hoveredProvince === province.name;
-                const stats = provinceStats.get(province.name);
-                const hasClients = stats && stats.clientCount > 0;
+          <Card className="p-4 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-slate-900 dark:to-slate-800">
+            <div className="relative">
+              <svg 
+                viewBox="0 0 600 280" 
+                className="w-full h-auto"
+                style={{ maxHeight: '400px' }}
+              >
+                {/* Caribbean Sea Background */}
+                <defs>
+                  <linearGradient id="seaGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="hsl(200, 80%, 85%)" />
+                    <stop offset="100%" stopColor="hsl(200, 70%, 75%)" />
+                  </linearGradient>
+                  <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feDropShadow dx="2" dy="2" stdDeviation="3" floodOpacity="0.2"/>
+                  </filter>
+                </defs>
                 
-                return (
-                  <g key={province.id}>
-                    <path
-                      d={province.path}
-                      fill={getProvinceColor(province.name)}
-                      stroke={isSelected || isHovered ? 'hsl(var(--primary))' : 'hsl(var(--border))'}
-                      strokeWidth={isSelected || isHovered ? 2 : 1}
-                      className="cursor-pointer transition-all duration-200"
-                      style={{
-                        transform: isHovered ? 'scale(1.02)' : 'scale(1)',
-                        transformOrigin: `${province.center.x}px ${province.center.y}px`
-                      }}
-                      onClick={() => setSelectedProvince(province.name)}
-                      onMouseEnter={() => setHoveredProvince(province.name)}
-                      onMouseLeave={() => setHoveredProvince(null)}
-                    />
-                    {hasClients && (
-                      <circle
-                        cx={province.center.x}
-                        cy={province.center.y}
-                        r={4}
-                        fill="hsl(var(--primary))"
-                        className="pointer-events-none"
+                <rect x="0" y="0" width="600" height="280" fill="url(#seaGradient)" rx="8" />
+                
+                {/* Island outline */}
+                <path
+                  d="M35,200 L55,175 L75,155 L95,135 L120,115 L145,100 L170,85 L200,75 L235,65 L275,60 L320,55 L365,60 L410,70 L450,85 L490,105 L530,130 L555,155 L570,180 L565,210 L545,230 L510,245 L465,250 L420,245 L380,235 L340,225 L305,220 L270,215 L235,210 L200,210 L165,215 L130,225 L95,235 L60,240 L40,230 Z"
+                  fill="hsl(45, 30%, 90%)"
+                  stroke="hsl(45, 20%, 70%)"
+                  strokeWidth="2"
+                  filter="url(#shadow)"
+                  className="transition-opacity"
+                  style={{ opacity: 0.3 }}
+                />
+                
+                {/* Provinces */}
+                {PROVINCES.map(province => {
+                  const isSelected = selectedProvince === province.name;
+                  const isHovered = hoveredProvince === province.name;
+                  const stats = provinceStats.get(province.name);
+                  const hasClients = stats && stats.clientCount > 0;
+                  const hasSales = stats && stats.totalSales > 0;
+                  
+                  return (
+                    <g key={province.id}>
+                      <path
+                        d={province.path}
+                        fill={hasSales ? getProvinceColor(province.name) : 'hsl(var(--muted))'}
+                        stroke={isSelected || isHovered ? 'hsl(var(--primary))' : 'hsl(var(--border))'}
+                        strokeWidth={isSelected || isHovered ? 2.5 : 1}
+                        className="cursor-pointer transition-all duration-200"
+                        style={{
+                          filter: isHovered ? 'brightness(1.1)' : 'none',
+                        }}
+                        onClick={() => setSelectedProvince(province.name)}
+                        onMouseEnter={() => setHoveredProvince(province.name)}
+                        onMouseLeave={() => setHoveredProvince(null)}
                       />
-                    )}
-                  </g>
-                );
-              })}
-
-              {/* Tooltip */}
-              {hoveredProvince && (
-                <g>
-                  {(() => {
-                    const province = PROVINCES.find(p => p.name === hoveredProvince);
-                    const stats = provinceStats.get(hoveredProvince);
-                    if (!province || !stats) return null;
-                    
-                    return (
-                      <>
-                        <rect
-                          x={province.center.x - 60}
-                          y={province.center.y - 50}
-                          width="120"
-                          height="40"
-                          fill="hsl(var(--card))"
-                          stroke="hsl(var(--border))"
-                          rx="4"
+                      {hasClients && (
+                        <circle
+                          cx={province.center.x}
+                          cy={province.center.y}
+                          r={hasSales ? 3 : 2}
+                          fill={hasSales ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))"}
                           className="pointer-events-none"
                         />
-                        <text
-                          x={province.center.x}
-                          y={province.center.y - 35}
-                          textAnchor="middle"
-                          className="text-xs font-semibold fill-foreground pointer-events-none"
-                        >
-                          {province.name}
-                        </text>
-                        <text
-                          x={province.center.x}
-                          y={province.center.y - 20}
-                          textAnchor="middle"
-                          className="text-xs fill-muted-foreground pointer-events-none"
-                        >
-                          {stats.clientCount} clientes • ${formatNumber(stats.totalSales)}
-                        </text>
-                      </>
-                    );
-                  })()}
-                </g>
-              )}
-            </svg>
+                      )}
+                    </g>
+                  );
+                })}
+
+                {/* Hover Tooltip */}
+                {hoveredProvince && (
+                  <g>
+                    {(() => {
+                      const province = PROVINCES.find(p => p.name === hoveredProvince);
+                      const stats = provinceStats.get(hoveredProvince);
+                      if (!province || !stats) return null;
+                      
+                      const tooltipX = Math.min(Math.max(province.center.x, 80), 520);
+                      const tooltipY = province.center.y - 45;
+                      
+                      return (
+                        <>
+                          <rect
+                            x={tooltipX - 70}
+                            y={tooltipY}
+                            width="140"
+                            height="38"
+                            fill="hsl(var(--card))"
+                            stroke="hsl(var(--border))"
+                            rx="6"
+                            className="pointer-events-none"
+                            style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.1))' }}
+                          />
+                          <text
+                            x={tooltipX}
+                            y={tooltipY + 14}
+                            textAnchor="middle"
+                            className="text-xs font-semibold pointer-events-none"
+                            fill="hsl(var(--foreground))"
+                            style={{ fontSize: '11px' }}
+                          >
+                            {province.name}
+                          </text>
+                          <text
+                            x={tooltipX}
+                            y={tooltipY + 28}
+                            textAnchor="middle"
+                            className="pointer-events-none"
+                            fill="hsl(var(--muted-foreground))"
+                            style={{ fontSize: '10px' }}
+                          >
+                            {stats.clientCount} clientes • ${formatNumber(stats.totalSales)}
+                          </text>
+                        </>
+                      );
+                    })()}
+                  </g>
+                )}
+              </svg>
+            </div>
 
             {/* Legend */}
-            <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted-foreground">
+            <div className="flex items-center justify-center gap-6 mt-4 text-xs text-muted-foreground">
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-muted" />
+                <div className="w-4 h-4 rounded" style={{ backgroundColor: 'hsl(var(--muted))' }} />
                 <span>Sin ventas</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-primary/30" />
+                <div className="w-4 h-4 rounded" style={{ backgroundColor: 'hsl(142, 76%, 60%)' }} />
                 <span>Bajo</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-primary/60" />
+                <div className="w-4 h-4 rounded" style={{ backgroundColor: 'hsl(142, 76%, 45%)' }} />
                 <span>Medio</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-primary" />
+                <div className="w-4 h-4 rounded" style={{ backgroundColor: 'hsl(142, 76%, 30%)' }} />
                 <span>Alto</span>
               </div>
             </div>
           </Card>
         </div>
 
-        {/* Province List */}
-        <Card>
-          <CardContent className="pt-4">
-            <h4 className="font-semibold mb-3">Provincias con Clientes</h4>
-            <ScrollArea className="h-[350px]">
-              <div className="space-y-1">
-                {Array.from(provinceStats.entries())
-                  .filter(([_, stats]) => stats.clientCount > 0)
-                  .sort((a, b) => b[1].totalSales - a[1].totalSales)
-                  .map(([name, stats]) => (
-                    <button
-                      key={name}
-                      onClick={() => setSelectedProvince(name)}
-                      className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors text-left"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{name}</p>
-                        <p className="text-xs text-muted-foreground">{stats.clientCount} clientes</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold">${formatNumber(stats.totalSales)}</span>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    </button>
-                  ))}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+        {/* Province List - Ranking */}
+        <div>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-emerald-600" />
+                Ranking por Ventas
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[350px]">
+                <div className="space-y-2">
+                  {activeProvinces.length > 0 ? (
+                    activeProvinces.map(([name, stat], index) => (
+                      <button
+                        key={name}
+                        onClick={() => setSelectedProvince(name)}
+                        onMouseEnter={() => setHoveredProvince(name)}
+                        onMouseLeave={() => setHoveredProvince(null)}
+                        className={`w-full p-3 rounded-lg border transition-all text-left ${
+                          hoveredProvince === name 
+                            ? 'border-primary bg-primary/5' 
+                            : 'border-border hover:border-primary/50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <Badge 
+                              variant={index < 3 ? "default" : "secondary"} 
+                              className="h-5 w-5 p-0 flex items-center justify-center text-xs"
+                            >
+                              {index + 1}
+                            </Badge>
+                            <span className="font-medium text-sm truncate">{name}</span>
+                          </div>
+                          <Eye className="h-3 w-3 text-muted-foreground" />
+                        </div>
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>{stat.clientCount} clientes</span>
+                          <span className="font-medium text-foreground">${formatNumber(stat.totalSales)}</span>
+                        </div>
+                        {stat.inactiveClients.length > 0 && (
+                          <div className="mt-1 flex items-center gap-1 text-xs text-amber-600">
+                            <AlertTriangle className="h-3 w-3" />
+                            <span>{stat.inactiveClients.length} sin compras recientes</span>
+                          </div>
+                        )}
+                      </button>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No hay clientes con provincia asignada
+                    </p>
+                  )}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
