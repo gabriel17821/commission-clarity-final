@@ -111,12 +111,38 @@ function parseDate(str: string): Date | null {
   return null;
 }
 
-// Parse number from string (allow 0 for free items)
+// Parse number from string (supports 1,234.56 and 1.234,56)
 function parseNumber(str: string, allowZero: boolean = false): number | null {
-  if (!str) return allowZero ? 0 : null;
-  const cleaned = str.replace(/[^\d.,-]/g, '').replace(',', '.');
-  const num = parseFloat(cleaned);
-  if (isNaN(num)) return null;
+  const raw = (str ?? '').toString().trim();
+  if (!raw) return allowZero ? 0 : null;
+
+  // Keep digits, separators and minus sign
+  const cleaned = raw.replace(/[^0-9,.-]/g, '');
+
+  const lastComma = cleaned.lastIndexOf(',');
+  const lastDot = cleaned.lastIndexOf('.');
+
+  let normalized = cleaned;
+
+  // If both separators exist, assume the last one is the decimal separator
+  if (lastComma !== -1 && lastDot !== -1) {
+    const decimalSep = lastComma > lastDot ? ',' : '.';
+    const thousandSep = decimalSep === ',' ? '.' : ',';
+
+    normalized = normalized.split(thousandSep).join('');
+    normalized = normalized.split(decimalSep).join('.');
+  } else if (lastComma !== -1) {
+    // Only comma exists: treat as decimal if it looks like decimals (e.g. 123,45)
+    const looksDecimal = /,\d{1,3}$/.test(normalized);
+    normalized = looksDecimal ? normalized.replace(',', '.') : normalized.split(',').join('');
+  } else if (lastDot !== -1) {
+    // Only dot exists: treat as decimal if it looks like decimals (e.g. 123.45)
+    const looksDecimal = /\.\d{1,3}$/.test(normalized);
+    normalized = looksDecimal ? normalized : normalized.split('.').join('');
+  }
+
+  const num = Number.parseFloat(normalized);
+  if (Number.isNaN(num)) return null;
   if (!allowZero && num <= 0) return null;
   return num;
 }
