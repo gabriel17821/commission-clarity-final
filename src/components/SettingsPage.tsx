@@ -95,17 +95,30 @@ export const SettingsPage = ({
       
       const startIndex = lines[0].toLowerCase().includes('nombre') ? 1 : 0;
       
+      // Detect CSV format based on header or first data row
+      const headerLine = lines[0].toLowerCase();
+      const isSimpleFormat = headerLine.includes('provincia') && !headerLine.includes('telefono') && !headerLine.includes('email');
+      
       const newClients: { name: string; phone?: string; email?: string; province?: string }[] = [];
       
       for (let i = startIndex; i < lines.length; i++) {
         const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
         if (values[0]) {
-          newClients.push({
-            name: values[0].toUpperCase(),
-            phone: values[1] || undefined,
-            email: values[2] || undefined,
-            province: values[3] || undefined,
-          });
+          if (isSimpleFormat || values.length === 2) {
+            // Format: Nombre, Provincia
+            newClients.push({
+              name: values[0].toUpperCase(),
+              province: values[1] || undefined,
+            });
+          } else {
+            // Format: Nombre, Teléfono, Email, Provincia
+            newClients.push({
+              name: values[0].toUpperCase(),
+              phone: values[1] || undefined,
+              email: values[2] || undefined,
+              province: values[3] || undefined,
+            });
+          }
         }
       }
 
@@ -355,7 +368,7 @@ export const SettingsPage = ({
             </p>
             
             <div className="border-t pt-3 mt-3">
-              <p className="text-xs text-muted-foreground mb-2">CSV: Nombre, Teléfono, Email, Provincia</p>
+              <p className="text-xs text-muted-foreground mb-2">CSV: Nombre,Provincia ó Nombre,Teléfono,Email,Provincia</p>
               <input
                 ref={fileInputRef}
                 type="file"
