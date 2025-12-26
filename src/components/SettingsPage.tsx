@@ -2,13 +2,13 @@ import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Settings, Upload, Download, Trash2, FileUp, AlertTriangle, Check, Loader2, Users, Package } from 'lucide-react';
+import { Settings, Upload, Download, Trash2, FileUp, AlertTriangle, Check, Loader2, Users, Package, Link2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Client } from '@/hooks/useClients';
 import { ProductCatalogDialog } from '@/components/ProductCatalogDialog';
 import { ProductCSVImporter } from '@/components/ProductCSVImporter';
-
+import { MatchManagement } from '@/components/MatchManagement';
 interface SettingsPageProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;

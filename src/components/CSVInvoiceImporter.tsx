@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -21,10 +21,11 @@ import { toast } from 'sonner';
 import { parse, format } from 'date-fns';
 import { formatCurrency } from '@/lib/formatters';
 import {
-  findSavedProductMatch,
-  findSavedClientMatch,
+  getProductMatches,
+  getClientMatches,
   saveProductMatch,
   saveClientMatch,
+  ManualMatch,
 } from '@/lib/matchingStore';
 
 interface Product {
@@ -85,6 +86,16 @@ interface CSVInvoiceImporterProps {
   }[]) => Promise<void>;
 }
 
+// Normalize text for matching
+function normalizeForMatch(text: string): string {
+  return (text || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
 // Parse date - supports common formats
 function parseDate(str: string): Date | null {
   const trimmed = str.trim();
@@ -126,7 +137,24 @@ export const CSVInvoiceImporter = ({ products, clients, onImport, onBulkImport }
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [manualMatches, setManualMatches] = useState<Record<string, { productId?: string; clientId?: string }>>({});
+  const [savedProductMatches, setSavedProductMatches] = useState<ManualMatch[]>([]);
+  const [savedClientMatches, setSavedClientMatches] = useState<ManualMatch[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load saved matches on mount
+  useEffect(() => {
+    const loadMatches = async () => {
+      const [productMatches, clientMatches] = await Promise.all([
+        getProductMatches(),
+        getClientMatches(),
+      ]);
+      setSavedProductMatches(productMatches);
+      setSavedClientMatches(clientMatches);
+    };
+    if (open) {
+      loadMatches();
+    }
+  }, [open]);
 
   const downloadTemplate = () => {
     const template = `NCF_SUFFIX,FECHA,CLIENTE,PRODUCTO,CANTIDAD,PRECIO_UNITARIO
@@ -141,6 +169,22 @@ B0100002905,2024-11-01,FARMACIA CENTRAL,CETERIPLEX CETIRIZINA TAB 1/100,3,900.0`
     link.click();
     URL.revokeObjectURL(link.href);
     toast.success('Template descargado');
+  };
+
+  /**
+   * Find product match from saved matches
+   */
+  const findProductMatch = (csvProductName: string): ManualMatch | undefined => {
+    const normalizedCsv = normalizeForMatch(csvProductName);
+    return savedProductMatches.find((m) => m.csvName === normalizedCsv);
+  };
+
+  /**
+   * Find client match from saved matches
+   */
+  const findClientMatch = (csvClientName: string): ManualMatch | undefined => {
+    const normalizedCsv = normalizeForMatch(csvClientName);
+    return savedClientMatches.find((m) => m.csvName === normalizedCsv);
   };
 
   /**
@@ -212,7 +256,7 @@ B0100002905,2024-11-01,FARMACIA CENTRAL,CETERIPLEX CETIRIZINA TAB 1/100,3,900.0`
       let resolvedProductName: string | undefined;
       let needsManualProductMatch = false;
 
-      const savedProductMatch = findSavedProductMatch(producto);
+      const savedProductMatch = findProductMatch(producto);
       if (savedProductMatch) {
         // Verify the saved match still exists
         const productExists = products.find(p => p.id === savedProductMatch.matchedId);
@@ -225,7 +269,7 @@ B0100002905,2024-11-01,FARMACIA CENTRAL,CETERIPLEX CETIRIZINA TAB 1/100,3,900.0`
       if (!resolvedProductId) {
         // Try exact match (case-insensitive)
         const exactMatch = products.find(
-          p => p.name.toLowerCase().trim() === producto.toLowerCase().trim()
+          p => p.name.toUpperCase().trim() === producto.toUpperCase().trim()
         );
         if (exactMatch) {
           resolvedProductId = exactMatch.id;
@@ -235,12 +279,12 @@ B0100002905,2024-11-01,FARMACIA CENTRAL,CETERIPLEX CETIRIZINA TAB 1/100,3,900.0`
         }
       }
 
-      // Try to match client
+      // Try to match client (case-insensitive, normalized)
       let resolvedClientId: string | undefined;
       let resolvedClientName: string | undefined;
       let needsManualClientMatch = false;
 
-      const savedClientMatch = findSavedClientMatch(cliente);
+      const savedClientMatch = findClientMatch(cliente);
       if (savedClientMatch) {
         const clientExists = clients.find(c => c.id === savedClientMatch.matchedId);
         if (clientExists) {
@@ -250,8 +294,10 @@ B0100002905,2024-11-01,FARMACIA CENTRAL,CETERIPLEX CETIRIZINA TAB 1/100,3,900.0`
       }
 
       if (!resolvedClientId && cliente) {
+        // Normalize both for comparison
+        const normalizedCsvClient = cliente.toUpperCase().trim();
         const exactMatch = clients.find(
-          c => c.name.toLowerCase().trim() === cliente.toLowerCase().trim()
+          c => c.name.toUpperCase().trim() === normalizedCsvClient
         );
         if (exactMatch) {
           resolvedClientId = exactMatch.id;
@@ -360,12 +406,19 @@ B0100002905,2024-11-01,FARMACIA CENTRAL,CETERIPLEX CETIRIZINA TAB 1/100,3,900.0`
     reader.readAsText(file);
   };
 
-  const handleManualProductMatch = (csvProductName: string, productId: string) => {
+  const handleManualProductMatch = async (csvProductName: string, productId: string) => {
     const product = products.find(p => p.id === productId);
     if (!product) return;
 
     // Save to persistent storage
-    saveProductMatch(csvProductName, productId, product.name);
+    await saveProductMatch(csvProductName, productId, product.name);
+
+    // Update local saved matches
+    const normalizedKey = normalizeForMatch(csvProductName);
+    setSavedProductMatches(prev => [
+      ...prev.filter(m => m.csvName !== normalizedKey),
+      { id: '', csvName: normalizedKey, matchedId: productId, matchedName: product.name, matchType: 'product' }
+    ]);
 
     // Update local state
     setManualMatches(prev => ({
@@ -389,12 +442,19 @@ B0100002905,2024-11-01,FARMACIA CENTRAL,CETERIPLEX CETIRIZINA TAB 1/100,3,900.0`
     toast.success(`Match guardado: ${csvProductName} → ${product.name}`);
   };
 
-  const handleManualClientMatch = (csvClientName: string, clientId: string) => {
+  const handleManualClientMatch = async (csvClientName: string, clientId: string) => {
     const client = clients.find(c => c.id === clientId);
     if (!client) return;
 
     // Save to persistent storage
-    saveClientMatch(csvClientName, clientId, client.name);
+    await saveClientMatch(csvClientName, clientId, client.name);
+
+    // Update local saved matches
+    const normalizedKey = normalizeForMatch(csvClientName);
+    setSavedClientMatches(prev => [
+      ...prev.filter(m => m.csvName !== normalizedKey),
+      { id: '', csvName: normalizedKey, matchedId: clientId, matchedName: client.name, matchType: 'client' }
+    ]);
 
     // Update local state
     setManualMatches(prev => ({
@@ -564,7 +624,7 @@ B0100002905,2024-11-01,FARMACIA CENTRAL,CETERIPLEX CETIRIZINA TAB 1/100,3,900.0`
                 <span className="font-semibold">Productos sin match ({unmatchedProducts.length})</span>
               </div>
               <p className="text-xs text-muted-foreground">
-                Selecciona el producto correcto del catálogo. El match se guardará para futuras importaciones.
+                Selecciona el producto correcto del catálogo. El match se guardará permanentemente.
               </p>
               <div className="space-y-2 max-h-40 overflow-y-auto">
                 {unmatchedProducts.map((csvName) => (
@@ -596,6 +656,9 @@ B0100002905,2024-11-01,FARMACIA CENTRAL,CETERIPLEX CETIRIZINA TAB 1/100,3,900.0`
                 <AlertCircle className="h-5 w-5" />
                 <span className="font-semibold">Clientes sin match ({unmatchedClients.length})</span>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Selecciona el cliente correcto. El match se guardará permanentemente.
+              </p>
               <div className="space-y-2 max-h-32 overflow-y-auto">
                 {unmatchedClients.map((csvName) => (
                   <div key={csvName} className="flex items-center gap-2 p-2 bg-background rounded border">

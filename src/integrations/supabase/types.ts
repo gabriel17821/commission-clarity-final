@@ -111,6 +111,36 @@ export type Database = {
         }
         Relationships: []
       }
+      csv_matches: {
+        Row: {
+          created_at: string
+          csv_name: string
+          id: string
+          match_type: string
+          matched_id: string
+          matched_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          csv_name: string
+          id?: string
+          match_type: string
+          matched_id: string
+          matched_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          csv_name?: string
+          id?: string
+          match_type?: string
+          matched_id?: string
+          matched_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       expenses: {
         Row: {
           amount: number
