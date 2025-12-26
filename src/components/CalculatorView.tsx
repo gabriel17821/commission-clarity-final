@@ -208,7 +208,6 @@ export const CalculatorView = ({
     setShowSearch(false);
     toast.success("Producto agregado");
   };
-  };
 
   const handleRemoveLine = (productId: string) => {
     setProductLines(prev => prev.filter(l => l.productId !== productId));
@@ -540,13 +539,40 @@ export const CalculatorView = ({
 
           {/* Totals */}
           <div className="border-t border-border bg-muted/20 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Factura</p>
-                <p className="text-2xl font-bold text-foreground">${formatNumber(actualTotal)}</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="rounded-lg border border-border bg-background/60 p-3">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Total bruto</p>
+                <p className="text-xl font-bold text-foreground">
+                  ${formatNumber(calculations.grossTotal ?? actualTotal)}
+                </p>
+                {(calculations.grossTotal ?? actualTotal) !== actualTotal && (
+                  <p className="text-xs text-muted-foreground">Antes de ofertas</p>
+                )}
               </div>
-              <div className="text-right">
-                <p className="text-sm text-muted-foreground">Mi Comisión</p>
+
+              <div className="rounded-lg border border-border bg-background/60 p-3">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Total neto</p>
+                <p className="text-xl font-bold text-foreground">${formatNumber(actualTotal)}</p>
+                <p className="text-xs text-muted-foreground">Usado para comisión</p>
+              </div>
+
+              <div className="rounded-lg border border-border bg-background/60 p-3">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <Gift className="h-3.5 w-3.5" />
+                  Ofertas
+                </p>
+                <p className="text-xl font-bold text-foreground">
+                  -${formatNumber(calculations.totalOfferValue ?? 0)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {formatNumber(calculations.totalOfferItems ?? 0)} unidades gratis
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between">
+              <div className="text-right ml-auto">
+                <p className="text-sm text-muted-foreground">Mi comisión</p>
                 <p className="text-2xl font-bold text-emerald-600">${formatCurrency(calculations.totalCommission)}</p>
               </div>
             </div>
