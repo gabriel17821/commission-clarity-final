@@ -3,16 +3,27 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Search, UserPlus, X, Check, User, Phone, Mail, Trash2, ChevronRight, Sparkles } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Search, UserPlus, X, Check, User, Phone, Mail, Trash2, ChevronRight, Sparkles, MapPin } from 'lucide-react';
 import { Client } from '@/hooks/useClients';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { createPortal } from 'react-dom';
+
+const PROVINCE_OPTIONS = [
+  'Azua', 'Bahoruco', 'Barahona', 'Dajabón', 'Distrito Nacional', 'Duarte',
+  'El Seibo', 'Elías Piña', 'Espaillat', 'Hato Mayor', 'Hermanas Mirabal',
+  'Independencia', 'La Altagracia', 'La Romana', 'La Vega', 'María Trinidad Sánchez',
+  'Monseñor Nouel', 'Monte Cristi', 'Monte Plata', 'Pedernales', 'Peravia',
+  'Puerto Plata', 'Samaná', 'San Cristóbal', 'San José de Ocoa', 'San Juan',
+  'San Pedro de Macorís', 'Sánchez Ramírez', 'Santiago', 'Santiago Rodríguez',
+  'Santo Domingo', 'Valverde',
+];
 
 interface ClientSelectorProps {
   clients: Client[];
   selectedClient: Client | null;
   onSelectClient: (client: Client | null) => void;
-  onAddClient: (name: string, phone?: string, email?: string) => Promise<Client | null>;
+  onAddClient: (name: string, phone?: string, email?: string, address?: string, notes?: string, province?: string) => Promise<Client | null>;
   onDeleteClient?: (id: string) => Promise<boolean>;
 }
 
@@ -29,6 +40,7 @@ export const ClientSelector = ({
   const [newName, setNewName] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [newEmail, setNewEmail] = useState('');
+  const [newProvince, setNewProvince] = useState('');
   const [loading, setLoading] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
@@ -132,7 +144,7 @@ export const ClientSelector = ({
     if (!newName.trim()) return;
     
     setLoading(true);
-    const client = await onAddClient(newName.trim(), newPhone.trim() || undefined, newEmail.trim() || undefined);
+    const client = await onAddClient(newName.trim(), newPhone.trim() || undefined, newEmail.trim() || undefined, undefined, undefined, newProvince || undefined);
     setLoading(false);
     
     if (client) {
@@ -140,6 +152,7 @@ export const ClientSelector = ({
       setNewName('');
       setNewPhone('');
       setNewEmail('');
+      setNewProvince('');
       setDialogOpen(false);
     }
   };
@@ -446,6 +459,20 @@ export const ClientSelector = ({
                   className="pl-9 h-11"
                 />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="client-province">Provincia</Label>
+              <Select value={newProvince} onValueChange={setNewProvince}>
+                <SelectTrigger className="h-11">
+                  <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
+                  <SelectValue placeholder="Seleccionar provincia" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROVINCE_OPTIONS.map(prov => (
+                    <SelectItem key={prov} value={prov}>{prov}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>

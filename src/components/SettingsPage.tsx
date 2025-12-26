@@ -61,6 +61,7 @@ interface SettingsPageProps {
   onUpdateProduct: (id: string, updates: any) => Promise<boolean>;
   onDeleteProduct: (id: string) => Promise<boolean>;
   onBulkAddProducts: (products: { name: string; percentage: number }[]) => Promise<void>;
+  onOpenClientCatalog?: () => void;
 }
 
 export const SettingsPage = ({
@@ -73,6 +74,7 @@ export const SettingsPage = ({
   onUpdateProduct,
   onDeleteProduct,
   onBulkAddProducts,
+  onOpenClientCatalog,
 }: SettingsPageProps) => {
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -328,34 +330,49 @@ export const SettingsPage = ({
             </p>
           </Card>
 
-          {/* Import Clients CSV */}
+          {/* Clientes */}
           <Card className="p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              <h3 className="font-semibold">Importar Clientes</h3>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-primary" />
+                <h3 className="font-semibold">Clientes</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                {onOpenClientCatalog && (
+                  <Button variant="outline" size="sm" onClick={onOpenClientCatalog} className="gap-2">
+                    <Users className="h-4 w-4" />
+                    Catálogo
+                  </Button>
+                )}
+              </div>
             </div>
             <p className="text-sm text-muted-foreground">
-              Sube un archivo CSV con columnas: Nombre, Teléfono, Email
+              Gestiona tus clientes, asigna provincias y edita información de contacto.
             </p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv"
-              onChange={handleCSVUpload}
-              className="hidden"
-            />
-            <Button
-              variant="outline"
-              className="w-full gap-2"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-            >
-              {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
-              {uploading ? 'Importando...' : 'Seleccionar archivo CSV'}
-            </Button>
             <p className="text-xs text-muted-foreground">
               Clientes actuales: <strong>{clients.length}</strong>
             </p>
+            
+            <div className="border-t pt-3 mt-3">
+              <p className="text-xs text-muted-foreground mb-2">Importar desde CSV (Nombre, Teléfono, Email)</p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleCSVUpload}
+                className="hidden"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full gap-2"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
+                {uploading ? 'Importando...' : 'Importar CSV'}
+              </Button>
+            </div>
           </Card>
 
           {/* Match Management */}
