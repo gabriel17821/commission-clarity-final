@@ -8,6 +8,12 @@ export interface InvoiceProduct {
   amount: number;
   percentage: number;
   commission: number;
+  // Detailed fields
+  quantity_sold?: number;
+  quantity_free?: number;
+  unit_price?: number;
+  gross_amount?: number;
+  net_amount?: number;
 }
 
 export interface Invoice {
@@ -78,7 +84,17 @@ export const useInvoices = (sellerId?: string | null) => {
     restPercentage: number,
     restCommission: number,
     totalCommission: number,
-    products: { name: string; amount: number; percentage: number; commission: number }[],
+    products: { 
+      name: string; 
+      amount: number; 
+      percentage: number; 
+      commission: number;
+      quantity_sold?: number;
+      quantity_free?: number;
+      unit_price?: number;
+      gross_amount?: number;
+      net_amount?: number;
+    }[],
     clientId?: string,
     sellerId?: string
   ) => {
@@ -116,15 +132,20 @@ export const useInvoices = (sellerId?: string | null) => {
       return null;
     }
 
-    // Save product breakdown
+    // Save product breakdown with detailed fields
     const productInserts = products
-      .filter(p => p.amount > 0)
+      .filter(p => p.amount > 0 || (p.quantity_sold ?? 0) > 0 || (p.quantity_free ?? 0) > 0)
       .map(p => ({
         invoice_id: invoice.id,
         product_name: p.name,
         amount: p.amount,
         percentage: p.percentage,
         commission: p.commission,
+        quantity_sold: p.quantity_sold ?? 0,
+        quantity_free: p.quantity_free ?? 0,
+        unit_price: p.unit_price ?? 0,
+        gross_amount: p.gross_amount ?? p.amount,
+        net_amount: p.net_amount ?? p.amount,
       }));
 
     if (productInserts.length > 0) {
@@ -168,7 +189,17 @@ export const useInvoices = (sellerId?: string | null) => {
     restPercentage: number,
     restCommission: number,
     totalCommission: number,
-    products: { name: string; amount: number; percentage: number; commission: number }[],
+    products: { 
+      name: string; 
+      amount: number; 
+      percentage: number; 
+      commission: number;
+      quantity_sold?: number;
+      quantity_free?: number;
+      unit_price?: number;
+      gross_amount?: number;
+      net_amount?: number;
+    }[],
     clientId?: string | null,
     sellerId?: string | null
   ) => {
@@ -220,13 +251,18 @@ export const useInvoices = (sellerId?: string | null) => {
       .eq('invoice_id', id);
 
     const productInserts = products
-      .filter(p => p.amount > 0)
+      .filter(p => p.amount > 0 || (p.quantity_sold ?? 0) > 0 || (p.quantity_free ?? 0) > 0)
       .map(p => ({
         invoice_id: id,
         product_name: p.name,
         amount: p.amount,
         percentage: p.percentage,
         commission: p.commission,
+        quantity_sold: p.quantity_sold ?? 0,
+        quantity_free: p.quantity_free ?? 0,
+        unit_price: p.unit_price ?? 0,
+        gross_amount: p.gross_amount ?? p.amount,
+        net_amount: p.net_amount ?? p.amount,
       }));
 
     if (productInserts.length > 0) {
@@ -250,7 +286,17 @@ export const useInvoices = (sellerId?: string | null) => {
       invoiceDate: string;
       totalAmount: number;
       totalCommission: number;
-      products: { name: string; amount: number; percentage: number; commission: number }[];
+      products: { 
+        name: string; 
+        amount: number; 
+        percentage: number; 
+        commission: number;
+        quantity_sold?: number;
+        quantity_free?: number;
+        unit_price?: number;
+        gross_amount?: number;
+        net_amount?: number;
+      }[];
       clientId?: string;
       sellerId?: string;
     }[]
@@ -293,15 +339,20 @@ export const useInvoices = (sellerId?: string | null) => {
         continue;
       }
 
-      // Save product breakdown
+      // Save product breakdown with detailed fields
       const productInserts = inv.products
-        .filter(p => p.amount > 0)
+        .filter(p => p.amount > 0 || (p.quantity_sold ?? 0) > 0 || (p.quantity_free ?? 0) > 0)
         .map(p => ({
           invoice_id: invoice.id,
           product_name: p.name,
           amount: p.amount,
           percentage: p.percentage,
           commission: p.commission,
+          quantity_sold: p.quantity_sold ?? 0,
+          quantity_free: p.quantity_free ?? 0,
+          unit_price: p.unit_price ?? 0,
+          gross_amount: p.gross_amount ?? p.amount,
+          net_amount: p.net_amount ?? p.amount,
         }));
 
       if (productInserts.length > 0) {

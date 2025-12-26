@@ -8,6 +8,7 @@ export interface Product {
   percentage: number;
   color: string;
   is_default: boolean;
+  category?: string | null;
 }
 
 const COLORS = ['#10b981', '#f59e0b', '#6366f1', '#ec4899', '#8b5cf6', '#14b8a6', '#f97316', '#06b6d4'];

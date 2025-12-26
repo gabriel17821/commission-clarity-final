@@ -9,6 +9,7 @@ export interface Client {
   email?: string | null;
   address?: string | null;
   notes?: string | null;
+  province?: string | null;
   created_at: string;
 }
 
