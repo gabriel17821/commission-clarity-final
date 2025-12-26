@@ -39,9 +39,12 @@ export const useClients = () => {
 
   const addClient = async (name: string, phone?: string, email?: string, address?: string, notes?: string): Promise<Client | null> => {
     try {
+      // Always save names in UPPERCASE for consistent matching
+      const normalizedName = name.toUpperCase().trim();
+      
       const { data, error } = await supabase
         .from('clients')
-        .insert([{ name, phone, email, address, notes }])
+        .insert([{ name: normalizedName, phone, email, address, notes }])
         .select()
         .single();
 
@@ -59,9 +62,15 @@ export const useClients = () => {
 
   const updateClient = async (id: string, updates: Partial<Client>): Promise<boolean> => {
     try {
+      // Normalize name to UPPERCASE if provided
+      const normalizedUpdates = {
+        ...updates,
+        ...(updates.name && { name: updates.name.toUpperCase().trim() }),
+      };
+      
       const { error } = await supabase
         .from('clients')
-        .update(updates)
+        .update(normalizedUpdates)
         .eq('id', id);
 
       if (error) throw error;
