@@ -408,23 +408,37 @@ export const InvoiceHistory = ({ invoices, loading, onDelete, onUpdateInvoice, c
                   }`}>
                     <div className="px-4 pb-4 pt-2 border-t border-border">
                       <div className="space-y-2 mb-4">
-                        {invoice.products?.map((p, pIndex) => (
-                          <div 
-                            key={p.id} 
-                            className="flex justify-between items-center text-sm p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
-                            style={{ animationDelay: `${pIndex * 50}ms` }}
-                          >
-                            <div className="flex items-center gap-3">
-                              <span className="px-2 py-1 rounded bg-primary/10 text-primary text-xs font-bold">{p.percentage}%</span>
-                              <span className="text-foreground">{p.product_name}</span>
+                        {invoice.products?.map((p, pIndex) => {
+                          const hasDetailedData = (p.quantity_sold ?? 0) > 0 || (p.quantity_free ?? 0) > 0 || (p.unit_price ?? 0) > 0;
+                          const totalQty = (p.quantity_sold ?? 0) + (p.quantity_free ?? 0);
+                          
+                          return (
+                            <div 
+                              key={p.id} 
+                              className="flex justify-between items-center text-sm p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                              style={{ animationDelay: `${pIndex * 50}ms` }}
+                            >
+                              <div className="flex items-center gap-3">
+                                <span className="px-2 py-1 rounded bg-primary/10 text-primary text-xs font-bold">{p.percentage}%</span>
+                                <div className="flex flex-col">
+                                  <span className="text-foreground">{p.product_name}</span>
+                                  {hasDetailedData && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {totalQty > 0 && `${totalQty} uds`}
+                                      {(p.quantity_free ?? 0) > 0 && ` (${p.quantity_free} gratis)`}
+                                      {(p.unit_price ?? 0) > 0 && ` × $${formatNumber(p.unit_price!)}`}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="text-right flex items-center gap-2">
+                                <span className="text-muted-foreground">${formatNumber(p.amount)}</span>
+                                <span className="text-muted-foreground">→</span>
+                                <span className="text-success font-semibold">${formatCurrency(p.commission)}</span>
+                              </div>
                             </div>
-                            <div className="text-right flex items-center gap-2">
-                              <span className="text-muted-foreground">${formatNumber(p.amount)}</span>
-                              <span className="text-muted-foreground">→</span>
-                              <span className="text-success font-semibold">${formatCurrency(p.commission)}</span>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                         {invoice.rest_amount > 0 && (
                           <div className="flex justify-between items-center text-sm p-3 rounded-lg bg-muted/30">
                             <div className="flex items-center gap-3">

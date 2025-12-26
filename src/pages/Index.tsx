@@ -108,18 +108,32 @@ const Index = () => {
     ncfSuffix: string;
     invoiceDate: Date;
     clientId?: string;
-    lines: { productId: string; quantity: number; unitPrice: number }[];
+    lines: { productId: string; quantity: number; unitPrice: number; isOffer?: boolean }[];
   }[]) => {
     const preparedInvoices = importedInvoices.map(inv => {
       const productData = inv.lines.map(line => {
         const product = products.find(p => p.id === line.productId);
-        const amount = line.quantity * line.unitPrice;
-        const commission = amount * ((product?.percentage || 0) / 100);
+        const quantity = line.quantity;
+        const unitPrice = line.unitPrice;
+        const isOffer = line.isOffer || unitPrice === 0;
+        
+        // Gross amount = quantity * unitPrice (even for offers, this is the "would-be" value)
+        const grossAmount = quantity * unitPrice;
+        // Net amount = 0 for offers (free items don't count towards invoice total)
+        const netAmount = isOffer ? 0 : grossAmount;
+        // Commission is calculated on net amount
+        const commission = netAmount * ((product?.percentage || 0) / 100);
+        
         return {
           name: product?.name || 'Producto',
-          amount,
+          amount: netAmount, // This is what we use for totals
           percentage: product?.percentage || 0,
           commission,
+          quantity_sold: isOffer ? 0 : quantity,
+          quantity_free: isOffer ? quantity : 0,
+          unit_price: unitPrice,
+          gross_amount: grossAmount,
+          net_amount: netAmount,
         };
       });
       

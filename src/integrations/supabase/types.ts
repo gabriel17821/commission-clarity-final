@@ -90,6 +90,7 @@ export type Database = {
           name: string
           notes: string | null
           phone: string | null
+          province: string | null
         }
         Insert: {
           address?: string | null
@@ -99,6 +100,7 @@ export type Database = {
           name: string
           notes?: string | null
           phone?: string | null
+          province?: string | null
         }
         Update: {
           address?: string | null
@@ -108,6 +110,7 @@ export type Database = {
           name?: string
           notes?: string | null
           phone?: string | null
+          province?: string | null
         }
         Relationships: []
       }
@@ -286,6 +289,7 @@ export type Database = {
       }
       products: {
         Row: {
+          category: string | null
           color: string
           created_at: string
           id: string
@@ -294,6 +298,7 @@ export type Database = {
           percentage: number
         }
         Insert: {
+          category?: string | null
           color?: string
           created_at?: string
           id?: string
@@ -302,6 +307,7 @@ export type Database = {
           percentage?: number
         }
         Update: {
+          category?: string | null
           color?: string
           created_at?: string
           id?: string
