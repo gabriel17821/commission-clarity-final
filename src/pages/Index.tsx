@@ -14,7 +14,7 @@ import { Statistics } from "@/components/Statistics";
 import { MonthlyBreakdown } from "@/components/MonthlyBreakdown";
 import { SellerManager } from "@/components/SellerManager";
 import { SettingsPage } from "@/components/SettingsPage";
-import { VisitPrepDashboard } from "@/components/analytics/VisitPrepDashboard";
+import { SalesAnalysisDashboard } from "@/components/analytics/SalesAnalysisDashboard";
 import { ClientCatalogDialog } from "@/components/ClientCatalogDialog";
 const Index = () => {
   const { products, loading: productsLoading, addProduct, updateProduct, deleteProduct, bulkAddProducts } = useProducts();
@@ -275,7 +275,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="analytics">
-            <VisitPrepDashboard 
+            <SalesAnalysisDashboard 
               invoices={invoices}
               clients={clients}
               products={products}
