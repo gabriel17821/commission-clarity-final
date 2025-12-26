@@ -358,11 +358,15 @@ export const InvoiceCalculator = ({
           {/* Product Lines Header */}
           <div className="px-4 py-3 border-b border-border bg-muted/20">
             <div className="grid grid-cols-12 gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              <div className="col-span-4">Producto</div>
-              <div className="col-span-2 text-center">Cantidad</div>
-              <div className="col-span-2 text-center">Precio Unit.</div>
-              <div className="col-span-2 text-right">Total</div>
-              <div className="col-span-2"></div>
+              <div className="col-span-3">Producto</div>
+              <div className="col-span-2 text-center">Vendidos</div>
+              <div className="col-span-1 text-center flex items-center justify-center gap-1">
+                <Gift className="h-3 w-3 text-amber-600" />
+                <span>Gratis</span>
+              </div>
+              <div className="col-span-2 text-center">Precio</div>
+              <div className="col-span-3 text-right">Neto → Comisión</div>
+              <div className="col-span-1"></div>
             </div>
           </div>
 
