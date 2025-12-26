@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -9,6 +9,48 @@ import { Client } from '@/hooks/useClients';
 import { ProductCatalogDialog } from '@/components/ProductCatalogDialog';
 import { ProductCSVImporter } from '@/components/ProductCSVImporter';
 import { MatchManagementDialog } from '@/components/MatchManagementDialog';
+
+// Delete individual data type button
+const DeleteDataButton = ({ label, table, icon }: { label: string; table: 'products' | 'clients'; icon: ReactNode }) => {
+  const [confirm, setConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!confirm) {
+      setConfirm(true);
+      setTimeout(() => setConfirm(false), 3000);
+      return;
+    }
+    
+    setDeleting(true);
+    try {
+      const { error } = await supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (error) throw error;
+      toast.success(`${table === 'products' ? 'Productos' : 'Clientes'} eliminados. Recarga la página.`);
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (error) {
+      console.error(`Error deleting ${table}:`, error);
+      toast.error(`Error al eliminar ${table === 'products' ? 'productos' : 'clientes'}`);
+    } finally {
+      setDeleting(false);
+      setConfirm(false);
+    }
+  };
+
+  return (
+    <Button
+      variant={confirm ? "destructive" : "outline"}
+      size="sm"
+      className="gap-2 text-xs"
+      onClick={handleDelete}
+      disabled={deleting}
+    >
+      {deleting ? <Loader2 className="h-3 w-3 animate-spin" /> : icon}
+      {deleting ? '...' : confirm ? 'Confirmar' : label}
+    </Button>
+  );
+};
+
 interface SettingsPageProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -379,8 +421,22 @@ export const SettingsPage = ({
               <h3 className="font-semibold text-destructive">Zona de Peligro</h3>
             </div>
             <p className="text-sm text-muted-foreground">
-              Elimina permanentemente todos los datos. Esta acción no se puede deshacer.
+              Acciones destructivas. No se pueden deshacer.
             </p>
+            
+            <div className="grid grid-cols-2 gap-2">
+              <DeleteDataButton 
+                label="Eliminar Productos"
+                table="products"
+                icon={<Package className="h-4 w-4" />}
+              />
+              <DeleteDataButton 
+                label="Eliminar Clientes"
+                table="clients"
+                icon={<Users className="h-4 w-4" />}
+              />
+            </div>
+            
             <Button
               variant={deleteConfirm ? "destructive" : "outline"}
               className="w-full gap-2"
@@ -394,7 +450,7 @@ export const SettingsPage = ({
               ) : (
                 <Trash2 className="h-4 w-4" />
               )}
-              {deleting ? 'Eliminando...' : deleteConfirm ? 'Click para confirmar' : 'Eliminar todos los datos'}
+              {deleting ? 'Eliminando...' : deleteConfirm ? 'Confirmar eliminar TODO' : 'Eliminar todos los datos'}
             </Button>
           </Card>
         </div>
