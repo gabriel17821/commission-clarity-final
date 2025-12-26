@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { X, Gift, Tag } from 'lucide-react';
+import { X, Gift } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface InvoiceLineItemWithOfferProps {
   productName: string;
@@ -95,66 +93,41 @@ export const InvoiceLineItemWithOffer = ({
         <div className="min-w-0 flex-1">
           <span className="font-medium text-sm truncate block">{productName}</span>
           {hasOffer && (
-            <Badge variant="outline" className="text-[10px] gap-1 mt-0.5 bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 border-amber-300">
+            <div className="flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-300 mt-0.5">
               <Gift className="h-3 w-3" />
-              {quantitySold}+{quantityFree}
-            </Badge>
+              <span>{quantitySold}+{quantityFree} = {totalQuantity}</span>
+            </div>
           )}
         </div>
       </div>
 
       {/* Quantity Sold */}
       <div className="col-span-2">
-        <div className="relative">
-          <Input
-            type="text"
-            inputMode="numeric"
-            value={soldStr}
-            onChange={handleSoldChange}
-            placeholder="0"
-            className="h-9 text-center text-sm font-semibold pr-6"
-          />
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Tag className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Cantidad vendida</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
+        <Input
+          type="text"
+          inputMode="numeric"
+          value={soldStr}
+          onChange={handleSoldChange}
+          placeholder="0"
+          className="h-9 text-center text-sm font-semibold"
+        />
       </div>
 
-      {/* Quantity Free */}
+      {/* Quantity Free - VISIBLE FIELD FOR OFFERS */}
       <div className="col-span-1">
-        <div className="relative">
-          <Input
-            type="text"
-            inputMode="numeric"
-            value={freeStr}
-            onChange={handleFreeChange}
-            placeholder="0"
-            className={cn(
-              "h-9 text-center text-sm font-semibold",
-              hasOffer && "border-amber-300 bg-amber-50/50 dark:bg-amber-900/30"
-            )}
-          />
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Gift className={cn(
-                  "absolute right-1 top-1/2 -translate-y-1/2 h-3 w-3",
-                  hasOffer ? "text-amber-600" : "text-muted-foreground"
-                )} />
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Cantidad gratis (oferta)</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
+        <Input
+          type="text"
+          inputMode="numeric"
+          value={freeStr}
+          onChange={handleFreeChange}
+          placeholder="0"
+          className={cn(
+            "h-9 text-center text-sm font-semibold",
+            hasOffer 
+              ? "border-amber-400 bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 font-bold" 
+              : "border-dashed"
+          )}
+        />
       </div>
 
       {/* Unit Price */}
@@ -174,9 +147,9 @@ export const InvoiceLineItemWithOffer = ({
 
       {/* Totals */}
       <div className="col-span-3 text-right space-y-0.5">
-        {hasOffer && (
-          <div className="flex items-center justify-end gap-1 text-xs text-muted-foreground line-through">
-            <span>Bruto: {formatCurrency(grossAmount)}</span>
+        {hasOffer && grossAmount > netAmount && (
+          <div className="text-xs text-muted-foreground line-through">
+            Bruto: {formatCurrency(grossAmount)}
           </div>
         )}
         <div className="flex items-center justify-end gap-2">
