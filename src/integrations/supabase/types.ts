@@ -175,26 +175,41 @@ export type Database = {
         Row: {
           amount: number
           commission: number
+          gross_amount: number
           id: string
           invoice_id: string
+          net_amount: number
           percentage: number
           product_name: string
+          quantity_free: number
+          quantity_sold: number
+          unit_price: number
         }
         Insert: {
           amount: number
           commission: number
+          gross_amount?: number
           id?: string
           invoice_id: string
+          net_amount?: number
           percentage: number
           product_name: string
+          quantity_free?: number
+          quantity_sold?: number
+          unit_price?: number
         }
         Update: {
           amount?: number
           commission?: number
+          gross_amount?: number
           id?: string
           invoice_id?: string
+          net_amount?: number
           percentage?: number
           product_name?: string
+          quantity_free?: number
+          quantity_sold?: number
+          unit_price?: number
         }
         Relationships: [
           {
@@ -210,9 +225,11 @@ export type Database = {
         Row: {
           client_id: string | null
           created_at: string
+          gross_total: number
           id: string
           invoice_date: string
           ncf: string
+          net_total: number
           rest_amount: number
           rest_commission: number
           rest_percentage: number
@@ -223,9 +240,11 @@ export type Database = {
         Insert: {
           client_id?: string | null
           created_at?: string
+          gross_total?: number
           id?: string
           invoice_date?: string
           ncf: string
+          net_total?: number
           rest_amount: number
           rest_commission: number
           rest_percentage?: number
@@ -236,9 +255,11 @@ export type Database = {
         Update: {
           client_id?: string | null
           created_at?: string
+          gross_total?: number
           id?: string
           invoice_date?: string
           ncf?: string
+          net_total?: number
           rest_amount?: number
           rest_commission?: number
           rest_percentage?: number

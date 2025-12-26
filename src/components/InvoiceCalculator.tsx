@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { RotateCcw, Calculator, Package, CalendarIcon, FileText, User, Save, RefreshCw, DollarSign, Plus, Search, X, Settings } from "lucide-react";
+import { RotateCcw, Calculator, Package, CalendarIcon, FileText, User, Save, RefreshCw, DollarSign, Plus, Search, X, Settings, Gift } from "lucide-react";
 import { EditRestPercentageDialog } from "@/components/EditRestPercentageDialog";
 import { BreakdownTable } from "@/components/BreakdownTable";
 import { ProductCatalogDialog } from "@/components/ProductCatalogDialog";
 import { ClientSelector } from "@/components/ClientSelector";
 import { SaveSuccessAnimation } from "@/components/SaveSuccessAnimation";
 import { InvoicePreviewDialog } from "@/components/InvoicePreviewDialog";
-import { InvoiceLineItem } from "@/components/InvoiceLineItem";
+import { InvoiceLineItemWithOffer } from "@/components/InvoiceLineItemWithOffer";
 import { formatNumber, formatCurrency } from "@/lib/formatters";
 import { format } from "date-fns";
 import { es } from 'date-fns/locale';
@@ -22,6 +22,7 @@ import { Invoice } from "@/hooks/useInvoices";
 import { Client } from "@/hooks/useClients";
 import { Seller } from "@/hooks/useSellers";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 
 interface Product {
   id: string;
@@ -33,17 +34,23 @@ interface Product {
 
 interface ProductLineData {
   productId: string;
-  quantity: number;
+  quantitySold: number;
+  quantityFree: number;
   unitPrice: number;
 }
 
 interface Breakdown {
   name: string;
   label: string;
-  amount: number;
+  amount: number; // For backward compatibility (same as netAmount)
+  grossAmount: number;
+  netAmount: number;
   percentage: number;
   commission: number;
   color: string;
+  quantitySold: number;
+  quantityFree: number;
+  unitPrice: number;
 }
 
 interface InvoiceCalculatorProps {
@@ -122,34 +129,56 @@ export const InvoiceCalculator = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Calculate totals
+  // Calculate totals with offer support
   const calculations = useMemo(() => {
     const breakdown: Breakdown[] = [];
-    let specialProductsTotal = 0;
+    let grossTotal = 0;
+    let netTotal = 0;
+    let totalOfferItems = 0;
 
     productLines.forEach(line => {
       const product = products.find(p => p.id === line.productId);
-      if (product && line.quantity > 0 && line.unitPrice > 0) {
-        const lineTotal = line.quantity * line.unitPrice;
-        const commission = lineTotal * (product.percentage / 100);
-        breakdown.push({
-          name: product.name,
-          label: product.name,
-          amount: lineTotal,
-          percentage: product.percentage,
-          commission,
-          color: product.color,
-        });
-        specialProductsTotal += lineTotal;
+      if (product) {
+        const totalQuantity = line.quantitySold + line.quantityFree;
+        const grossAmount = totalQuantity * line.unitPrice;
+        const netAmount = line.quantitySold * line.unitPrice;
+        const commission = netAmount * (product.percentage / 100);
+        
+        if (line.quantitySold > 0 || line.quantityFree > 0) {
+          breakdown.push({
+            name: product.name,
+            label: product.name,
+            amount: netAmount, // For backward compatibility
+            grossAmount,
+            netAmount,
+            percentage: product.percentage,
+            commission,
+            color: product.color,
+            quantitySold: line.quantitySold,
+            quantityFree: line.quantityFree,
+            unitPrice: line.unitPrice,
+          });
+          grossTotal += grossAmount;
+          netTotal += netAmount;
+          if (line.quantityFree > 0) totalOfferItems += line.quantityFree;
+        }
       }
     });
 
-    const totalInvoice = specialProductsTotal;
-    const restAmount = 0; // In this new mode, rest is calculated differently if needed
+    const restAmount = 0;
     const restCommission = restAmount * (restPercentage / 100);
     const totalCommission = breakdown.reduce((sum, item) => sum + item.commission, 0) + restCommission;
 
-    return { breakdown, totalInvoice, restAmount, restCommission, totalCommission, specialProductsTotal };
+    return { 
+      breakdown, 
+      totalInvoice: netTotal, 
+      grossTotal,
+      netTotal,
+      restAmount, 
+      restCommission, 
+      totalCommission,
+      totalOfferItems,
+    };
   }, [productLines, products, restPercentage]);
 
   const activeProductIds = productLines.map(l => l.productId);
@@ -159,7 +188,7 @@ export const InvoiceCalculator = ({
   );
 
   const handleAddLine = (productId: string) => {
-    setProductLines(prev => [...prev, { productId, quantity: 0, unitPrice: 0 }]);
+    setProductLines(prev => [...prev, { productId, quantitySold: 0, quantityFree: 0, unitPrice: 0 }]);
     setSearchTerm('');
     setShowSearch(false);
     toast.success("Producto agregado");
@@ -169,9 +198,15 @@ export const InvoiceCalculator = ({
     setProductLines(prev => prev.filter(l => l.productId !== productId));
   };
 
-  const handleQuantityChange = (productId: string, quantity: number) => {
+  const handleQuantitySoldChange = (productId: string, quantitySold: number) => {
     setProductLines(prev => prev.map(l => 
-      l.productId === productId ? { ...l, quantity } : l
+      l.productId === productId ? { ...l, quantitySold } : l
+    ));
+  };
+
+  const handleQuantityFreeChange = (productId: string, quantityFree: number) => {
+    setProductLines(prev => prev.map(l => 
+      l.productId === productId ? { ...l, quantityFree } : l
     ));
   };
 
@@ -179,17 +214,12 @@ export const InvoiceCalculator = ({
     setProductLines(prev => prev.map(l => 
       l.productId === productId ? { ...l, unitPrice } : l
     ));
-    // Also update productAmounts for backward compatibility
-    const line = productLines.find(l => l.productId === productId);
-    if (line) {
-      onProductChange(productId, line.quantity * unitPrice);
-    }
   };
 
   // Sync productAmounts when lines change
   useEffect(() => {
     productLines.forEach(line => {
-      const lineTotal = line.quantity * line.unitPrice;
+      const lineTotal = line.quantitySold * line.unitPrice;
       if (productAmounts[line.productId] !== lineTotal) {
         onProductChange(line.productId, lineTotal);
       }
@@ -215,10 +245,10 @@ export const InvoiceCalculator = ({
     setShowSaveAnimation(true);
     const fullNcf = `${ncfPrefix}${ncfSuffix.padStart(4, '0')}`;
     
-    // Build productAmounts from lines
+    // Build productAmounts from lines (using net amount = quantitySold * unitPrice)
     const amounts: Record<string, number> = {};
     productLines.forEach(line => {
-      amounts[line.productId] = line.quantity * line.unitPrice;
+      amounts[line.productId] = line.quantitySold * line.unitPrice;
     });
     
     await onSaveInvoice(fullNcf, format(invoiceDate, 'yyyy-MM-dd'), selectedClient?.id, amounts);
@@ -346,14 +376,16 @@ export const InvoiceCalculator = ({
                   const product = products.find(p => p.id === line.productId);
                   if (!product) return null;
                   return (
-                    <InvoiceLineItem
+                    <InvoiceLineItemWithOffer
                       key={line.productId}
                       productName={product.name}
                       productColor={product.color}
                       percentage={product.percentage}
-                      quantity={line.quantity}
+                      quantitySold={line.quantitySold}
+                      quantityFree={line.quantityFree}
                       unitPrice={line.unitPrice}
-                      onQuantityChange={(q) => handleQuantityChange(line.productId, q)}
+                      onQuantitySoldChange={(q) => handleQuantitySoldChange(line.productId, q)}
+                      onQuantityFreeChange={(q) => handleQuantityFreeChange(line.productId, q)}
                       onUnitPriceChange={(p) => handleUnitPriceChange(line.productId, p)}
                       onRemove={() => handleRemoveLine(line.productId)}
                     />
@@ -455,14 +487,32 @@ export const InvoiceCalculator = ({
           </div>
 
           {/* Totals */}
-          <div className="border-t border-border bg-muted/20 p-4">
+          <div className="border-t border-border bg-muted/20 p-4 space-y-3">
+            {/* Offer indicator */}
+            {calculations.totalOfferItems > 0 && (
+              <div className="flex items-center gap-2 p-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                <Gift className="h-4 w-4 text-amber-600" />
+                <span className="text-sm text-amber-700 dark:text-amber-300">
+                  <strong>{calculations.totalOfferItems}</strong> unidad{calculations.totalOfferItems !== 1 ? 'es' : ''} en oferta (sin comisión)
+                </span>
+              </div>
+            )}
+            
+            {/* Gross vs Net */}
+            {calculations.grossTotal !== calculations.netTotal && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Total Bruto</span>
+                <span className="font-mono line-through text-muted-foreground">${formatNumber(calculations.grossTotal)}</span>
+              </div>
+            )}
+            
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Factura</p>
-                <p className="text-2xl font-bold text-foreground">${formatNumber(calculations.totalInvoice)}</p>
+                <p className="text-sm text-muted-foreground">Total Neto (Base Comisión)</p>
+                <p className="text-2xl font-bold text-foreground">${formatNumber(calculations.netTotal)}</p>
               </div>
               <div className="text-right">
-                <p className="text-sm text-muted-foreground">Mi Comisión</p>
+                <p className="text-sm text-muted-foreground">Mi Comisión Real</p>
                 <p className="text-2xl font-bold text-emerald-600">${formatCurrency(calculations.totalCommission)}</p>
               </div>
             </div>

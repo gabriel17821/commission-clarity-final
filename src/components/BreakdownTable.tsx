@@ -1,4 +1,5 @@
 import { formatNumber, formatCurrency } from "@/lib/formatters";
+import { Gift } from "lucide-react";
 
 interface Breakdown {
   name: string;
@@ -7,6 +8,12 @@ interface Breakdown {
   percentage: number;
   commission: number;
   color: string;
+  // Optional offer fields
+  grossAmount?: number;
+  netAmount?: number;
+  quantitySold?: number;
+  quantityFree?: number;
+  unitPrice?: number;
 }
 
 interface BreakdownTableProps {
@@ -16,6 +23,8 @@ interface BreakdownTableProps {
   restPercentage: number;
   restCommission: number;
   totalCommission: number;
+  grossTotal?: number;
+  netTotal?: number;
 }
 
 export const BreakdownTable = ({
@@ -25,26 +34,40 @@ export const BreakdownTable = ({
   restPercentage,
   restCommission,
   totalCommission,
+  grossTotal,
+  netTotal,
 }: BreakdownTableProps) => {
-  const activeProducts = breakdown.filter(b => b.amount > 0);
+  const activeProducts = breakdown.filter(b => b.amount > 0 || (b.netAmount && b.netAmount > 0));
+  const hasOffers = activeProducts.some(b => b.quantityFree && b.quantityFree > 0);
   
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden">
-      <div className="bg-muted/50 px-4 py-3 border-b border-border">
+      <div className="bg-muted/50 px-4 py-3 border-b border-border flex items-center justify-between">
         <h3 className="text-sm font-medium text-muted-foreground">Desglose de Comisión</h3>
+        {hasOffers && (
+          <div className="flex items-center gap-1.5 text-amber-600">
+            <Gift className="h-4 w-4" />
+            <span className="text-xs font-medium">Incluye ofertas</span>
+          </div>
+        )}
       </div>
       
       <div className="divide-y divide-border">
         {/* Total Invoice Row */}
-        <div className="grid grid-cols-3 text-sm">
+        <div className="grid grid-cols-4 text-sm">
           <div className="px-4 py-3 text-muted-foreground">Total Factura</div>
-          <div className="px-4 py-3 text-right font-mono text-foreground">${formatNumber(totalInvoice)}</div>
+          <div className="px-4 py-3 text-right font-mono text-foreground">
+            {grossTotal && grossTotal !== netTotal && (
+              <span className="text-muted-foreground line-through mr-2">${formatNumber(grossTotal)}</span>
+            )}
+            ${formatNumber(totalInvoice)}
+          </div>
+          <div className="px-4 py-3"></div>
           <div className="px-4 py-3 text-right text-muted-foreground">—</div>
         </div>
         
         {/* Special Products */}
         {activeProducts.map((item, idx) => {
-          // Generate high-contrast colors for better visibility
           const contrastColors = [
             { bg: 'bg-indigo-500', text: 'text-indigo-600 dark:text-indigo-400' },
             { bg: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400' },
@@ -56,15 +79,30 @@ export const BreakdownTable = ({
             { bg: 'bg-teal-500', text: 'text-teal-600 dark:text-teal-400' },
           ];
           const colorSet = contrastColors[idx % contrastColors.length];
+          const hasOffer = item.quantityFree && item.quantityFree > 0;
+          const displayAmount = item.netAmount ?? item.amount;
           
           return (
-            <div key={idx} className="grid grid-cols-3 text-sm">
+            <div key={idx} className="grid grid-cols-4 text-sm">
               <div className="px-4 py-3 flex items-center gap-2">
                 <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${colorSet.bg}`} />
                 <span className="text-foreground font-medium truncate">{item.label}</span>
+                {hasOffer && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 font-medium">
+                    {item.quantitySold}+{item.quantityFree}
+                  </span>
+                )}
               </div>
               <div className="px-4 py-3 text-right font-mono text-foreground">
-                ${formatNumber(item.amount)}
+                {hasOffer && item.grossAmount && (
+                  <span className="text-muted-foreground line-through mr-2 text-xs">${formatNumber(item.grossAmount)}</span>
+                )}
+                ${formatNumber(displayAmount)}
+              </div>
+              <div className="px-4 py-3 text-center text-muted-foreground text-xs">
+                {hasOffer && item.quantitySold && item.unitPrice && (
+                  <span>{item.quantitySold} × ${formatNumber(item.unitPrice)}</span>
+                )}
               </div>
               <div className={`px-4 py-3 text-right font-mono font-semibold ${colorSet.text}`}>
                 +${formatCurrency(item.commission)}
@@ -76,11 +114,12 @@ export const BreakdownTable = ({
         
         {/* Rest Row */}
         {restAmount > 0 && (
-          <div className="grid grid-cols-3 text-sm">
+          <div className="grid grid-cols-4 text-sm">
             <div className="px-4 py-3 text-muted-foreground">Resto</div>
             <div className="px-4 py-3 text-right font-mono text-foreground">
               ${formatNumber(restAmount)}
             </div>
+            <div className="px-4 py-3"></div>
             <div className="px-4 py-3 text-right font-mono text-foreground">
               +${formatCurrency(restCommission)}
               <span className="text-muted-foreground text-xs ml-1">({restPercentage}%)</span>
@@ -89,8 +128,9 @@ export const BreakdownTable = ({
         )}
         
         {/* Total Row */}
-        <div className="grid grid-cols-3 text-sm bg-success/10">
+        <div className="grid grid-cols-4 text-sm bg-success/10">
           <div className="px-4 py-4 font-semibold text-foreground">Total Comisión</div>
+          <div className="px-4 py-4"></div>
           <div className="px-4 py-4"></div>
           <div className="px-4 py-4 text-right font-mono font-bold text-lg text-success">
             ${formatCurrency(totalCommission)}

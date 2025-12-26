@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Client } from '@/hooks/useClients';
 import { ProductCatalogDialog } from '@/components/ProductCatalogDialog';
 import { ProductCSVImporter } from '@/components/ProductCSVImporter';
-import { MatchManagement } from '@/components/MatchManagement';
+import { MatchManagementDialog } from '@/components/MatchManagementDialog';
 interface SettingsPageProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -318,11 +318,20 @@ export const SettingsPage = ({
 
           {/* Match Management */}
           <Card className="p-4 space-y-3">
-            <MatchManagement 
-              products={products as any}
-              clients={clients}
-              onRefresh={onRefetchClients}
-            />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Link2 className="h-5 w-5 text-primary" />
+                <h3 className="font-semibold">Matches CSV</h3>
+              </div>
+              <MatchManagementDialog 
+                products={products as any}
+                clients={clients}
+                onRefresh={onRefetchClients}
+              />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Administra las relaciones entre nombres CSV y productos/clientes del sistema
+            </p>
           </Card>
 
           {/* Backup & Restore */}
