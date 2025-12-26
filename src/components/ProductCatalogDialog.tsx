@@ -50,6 +50,8 @@ export const ProductCatalogDialog = ({
   const [loading, setLoading] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [viewMode, setViewMode] = useState<'list' | 'grouped'>('grouped');
+  const [showEditCategoryInput, setShowEditCategoryInput] = useState(false);
+  const [editCustomCategory, setEditCustomCategory] = useState('');
 
   // Get all unique categories from products (including custom ones)
   const allCategories = useMemo(() => {
@@ -107,6 +109,14 @@ export const ProductCatalogDialog = ({
     }
   };
 
+  const handleAddEditCustomCategory = () => {
+    if (editCustomCategory.trim()) {
+      setEditCategory(editCustomCategory.trim());
+      setEditCustomCategory('');
+      setShowEditCategoryInput(false);
+    }
+  };
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim()) return;
@@ -156,16 +166,56 @@ export const ProductCatalogDialog = ({
             />
             <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
           </div>
-          <select
-            value={editCategory}
-            onChange={(e) => setEditCategory(e.target.value)}
-            className="h-9 px-2 rounded-md border border-border bg-background text-sm"
-          >
-            <option value="">Sin categoría</option>
-            {allCategories.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
+          <div className="flex items-center gap-1">
+            <select
+              value={editCategory}
+              onChange={(e) => setEditCategory(e.target.value)}
+              className="h-9 px-2 rounded-md border border-border bg-background text-sm min-w-[90px]"
+            >
+              <option value="">Sin categoría</option>
+              {allCategories.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+            <Popover open={showEditCategoryInput} onOpenChange={setShowEditCategoryInput}>
+              <PopoverTrigger asChild>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="icon" 
+                  className="h-9 w-9 shrink-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowEditCategoryInput(true);
+                  }}
+                  title="Nueva categoría"
+                >
+                  <Tag className="h-3.5 w-3.5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-3" align="end" onClick={(e) => e.stopPropagation()}>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Nueva categoría</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={editCustomCategory}
+                      onChange={(e) => setEditCustomCategory(e.target.value)}
+                      placeholder="Nombre de la categoría"
+                      className="flex-1"
+                      onKeyDown={(e) => {
+                        e.stopPropagation();
+                        if (e.key === 'Enter') handleAddEditCustomCategory();
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <Button size="sm" onClick={handleAddEditCustomCategory} disabled={!editCustomCategory.trim()}>
+                      Usar
+                    </Button>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
           <Button size="icon" variant="ghost" onClick={handleSaveEdit} disabled={loading} className="h-9 w-9 text-success">
             <Save className="h-4 w-4" />
           </Button>
@@ -257,49 +307,59 @@ export const ProductCatalogDialog = ({
                 />
                 <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
               </div>
-              <Popover open={showCustomCategoryInput} onOpenChange={setShowCustomCategoryInput}>
-                <PopoverTrigger asChild>
-                  <div className="flex gap-1">
-                    <select
-                      value={newCategory}
-                      onChange={(e) => setNewCategory(e.target.value)}
-                      className="h-10 px-2 rounded-md border border-border bg-background text-sm min-w-[100px]"
-                    >
-                      <option value="">Categoría</option>
-                      {allCategories.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
+              <div className="flex items-center gap-1">
+                <select
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  className="h-10 px-2 rounded-md border border-border bg-background text-sm min-w-[100px]"
+                >
+                  <option value="">Categoría</option>
+                  {allCategories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+                <Popover open={showCustomCategoryInput} onOpenChange={setShowCustomCategoryInput}>
+                  <PopoverTrigger asChild>
                     <Button 
                       type="button" 
                       variant="outline" 
                       size="icon" 
                       className="h-10 w-10 shrink-0"
-                      onClick={() => setShowCustomCategoryInput(true)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowCustomCategoryInput(true);
+                      }}
                       title="Agregar nueva categoría"
                     >
                       <Tag className="h-4 w-4" />
                     </Button>
-                  </div>
-                </PopoverTrigger>
-                <PopoverContent className="w-64 p-3" align="end">
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Nueva categoría</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        value={newCustomCategory}
-                        onChange={(e) => setNewCustomCategory(e.target.value)}
-                        placeholder="Nombre de la categoría"
-                        className="flex-1"
-                        onKeyDown={(e) => e.key === 'Enter' && handleAddCustomCategory()}
-                      />
-                      <Button size="sm" onClick={handleAddCustomCategory} disabled={!newCustomCategory.trim()}>
-                        Usar
-                      </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-3" align="end" onClick={(e) => e.stopPropagation()}>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Nueva categoría</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          value={newCustomCategory}
+                          onChange={(e) => setNewCustomCategory(e.target.value)}
+                          placeholder="Nombre de la categoría"
+                          className="flex-1"
+                          onKeyDown={(e) => {
+                            e.stopPropagation();
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddCustomCategory();
+                            }
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <Button type="button" size="sm" onClick={handleAddCustomCategory} disabled={!newCustomCategory.trim()}>
+                          Usar
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
+                  </PopoverContent>
+                </Popover>
+              </div>
               <Button type="submit" size="icon" disabled={loading || !newName.trim()}>
                 <Plus className="h-4 w-4" />
               </Button>
