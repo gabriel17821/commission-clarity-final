@@ -259,7 +259,7 @@ export function ClientCatalogDialog({
           </form>
         )}
 
-        <ScrollArea className="flex-1 -mx-6 px-6">
+        <ScrollArea className="flex-1 min-h-0 -mx-6 px-6" style={{ maxHeight: 'calc(85vh - 280px)' }}>
           {groupedByProvince.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
