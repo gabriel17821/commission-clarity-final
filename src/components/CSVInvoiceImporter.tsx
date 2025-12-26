@@ -10,7 +10,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { Upload, Download, FileText, AlertCircle, CheckCircle2, Loader2, XCircle, ArrowRight } from 'lucide-react';
+import { Upload, Download, FileText, AlertCircle, CheckCircle2, Loader2, XCircle, ArrowRight, Gift } from 'lucide-react';
 import { toast } from 'sonner';
 import { parse, format } from 'date-fns';
 import { formatCurrency } from '@/lib/formatters';
@@ -41,6 +41,7 @@ interface ParsedRow {
   producto: string;
   cantidad: number;
   precioUnitario: number;
+  isOffer: boolean; // True if unit price is 0 (free item)
   isValid: boolean;
   errors: string[];
   // Resolved
@@ -70,13 +71,13 @@ interface CSVInvoiceImporterProps {
     ncfSuffix: string;
     invoiceDate: Date;
     clientId?: string;
-    lines: { productId: string; quantity: number; unitPrice: number }[];
+    lines: { productId: string; quantity: number; unitPrice: number; isOffer?: boolean }[];
   }) => void;
   onBulkImport?: (invoices: {
     ncfSuffix: string;
     invoiceDate: Date;
     clientId?: string;
-    lines: { productId: string; quantity: number; unitPrice: number }[];
+    lines: { productId: string; quantity: number; unitPrice: number; isOffer?: boolean }[];
   }[]) => Promise<void>;
 }
 
@@ -110,12 +111,14 @@ function parseDate(str: string): Date | null {
   return null;
 }
 
-// Parse number from string
-function parseNumber(str: string): number | null {
-  if (!str) return null;
+// Parse number from string (allow 0 for free items)
+function parseNumber(str: string, allowZero: boolean = false): number | null {
+  if (!str) return allowZero ? 0 : null;
   const cleaned = str.replace(/[^\d.,-]/g, '').replace(',', '.');
   const num = parseFloat(cleaned);
-  return isNaN(num) || num <= 0 ? null : num;
+  if (isNaN(num)) return null;
+  if (!allowZero && num <= 0) return null;
+  return num;
 }
 
 // Extract NCF suffix (last 4 digits)
@@ -211,6 +214,7 @@ B0100002905,2024-11-01,FARMACIA CENTRAL,CETERIPLEX CETIRIZINA TAB 1/100,3,900.0`
           producto: '',
           cantidad: 0,
           precioUnitario: 0,
+          isOffer: false,
           isValid: false,
           errors: [`Línea ${i + 1}: necesita 6 columnas, tiene ${parts.length}`],
         });
@@ -236,7 +240,8 @@ B0100002905,2024-11-01,FARMACIA CENTRAL,CETERIPLEX CETIRIZINA TAB 1/100,3,900.0`
         errors.push(`Cantidad inválida: "${cantidadStr}"`);
       }
 
-      const precioUnitario = parseNumber(precioStr);
+      // Allow 0 price for free/offer items
+      const precioUnitario = parseNumber(precioStr, true);
       if (precioUnitario === null) {
         errors.push(`Precio inválido: "${precioStr}"`);
       }
@@ -301,6 +306,8 @@ B0100002905,2024-11-01,FARMACIA CENTRAL,CETERIPLEX CETIRIZINA TAB 1/100,3,900.0`
         }
       }
 
+      const isOffer = (precioUnitario || 0) === 0;
+      
       rows.push({
         lineNumber: i + 1,
         ncfSuffix,
@@ -309,6 +316,7 @@ B0100002905,2024-11-01,FARMACIA CENTRAL,CETERIPLEX CETIRIZINA TAB 1/100,3,900.0`
         producto,
         cantidad: cantidad || 0,
         precioUnitario: precioUnitario || 0,
+        isOffer,
         isValid: errors.length === 0,
         errors,
         resolvedDate: parsedDate || undefined,
@@ -490,11 +498,12 @@ B0100002905,2024-11-01,FARMACIA CENTRAL,CETERIPLEX CETIRIZINA TAB 1/100,3,900.0`
         invoiceDate: inv.date,
         clientId: inv.rows[0]?.resolvedClientId,
         lines: inv.rows
-          .filter((r) => r.resolvedProductId && r.cantidad > 0 && r.precioUnitario > 0)
+          .filter((r) => r.resolvedProductId && r.cantidad > 0) // Allow 0 price for offers
           .map((r) => ({
             productId: r.resolvedProductId!,
             quantity: r.cantidad,
             unitPrice: r.precioUnitario,
+            isOffer: r.precioUnitario === 0, // Mark as offer if price is 0
           })),
       }))
       .filter((inv) => inv.lines.length > 0);
@@ -700,23 +709,34 @@ B0100002905,2024-11-01,FARMACIA CENTRAL,CETERIPLEX CETIRIZINA TAB 1/100,3,900.0`
                   </thead>
                   <tbody className="divide-y divide-border">
                     {parsedRows.map((row, idx) => (
-                      <tr key={idx} className={row.isValid ? '' : 'bg-destructive/5'}>
+                      <tr key={idx} className={!row.isValid ? 'bg-destructive/5' : row.isOffer ? 'bg-amber-50 dark:bg-amber-950/30' : ''}>
                         <td className="px-2 py-1.5 font-mono">{row.ncfSuffix}</td>
                         <td className="px-2 py-1.5">{row.fecha}</td>
                         <td className="px-2 py-1.5">
-                          {row.resolvedProductName ? (
-                            <div>
-                              <span className="text-primary font-medium">{row.resolvedProductName}</span>
-                              {row.resolvedProductName !== row.producto && (
-                                <span className="block text-[10px] text-muted-foreground italic">← {row.producto}</span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-amber-600">{row.producto}</span>
-                          )}
+                          <div className="flex items-center gap-1">
+                            {row.isOffer && (
+                              <Gift className="h-3 w-3 text-amber-600 shrink-0" />
+                            )}
+                            {row.resolvedProductName ? (
+                              <div>
+                                <span className="text-primary font-medium">{row.resolvedProductName}</span>
+                                {row.resolvedProductName !== row.producto && (
+                                  <span className="block text-[10px] text-muted-foreground italic">← {row.producto}</span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-amber-600">{row.producto}</span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-2 py-1.5 text-right">{row.cantidad}</td>
-                        <td className="px-2 py-1.5 text-right">{formatCurrency(row.precioUnitario)}</td>
+                        <td className="px-2 py-1.5 text-right">
+                          {row.isOffer ? (
+                            <span className="text-amber-600 font-medium">GRATIS</span>
+                          ) : (
+                            formatCurrency(row.precioUnitario)
+                          )}
+                        </td>
                         <td className="px-2 py-1.5 text-right font-medium">
                           {formatCurrency(row.cantidad * row.precioUnitario)}
                         </td>
