@@ -3,8 +3,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Settings2, Plus, Pencil, Trash2, Save, X, Package, ChevronDown, ChevronRight, Layers } from 'lucide-react';
+import { Settings2, Plus, Pencil, Trash2, Save, X, Package, ChevronDown, ChevronRight, Layers, Tag } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface Product {
   id: string;
@@ -23,11 +24,10 @@ interface ProductCatalogDialogProps {
   trigger?: React.ReactNode;
 }
 
-const CATEGORY_OPTIONS = [
+const DEFAULT_CATEGORIES = [
   'Azetabio',
   'Vitalis',
   'DLS',
-  'Otro',
 ];
 
 export const ProductCatalogDialog = ({
@@ -45,9 +45,20 @@ export const ProductCatalogDialog = ({
   const [newName, setNewName] = useState('');
   const [newPercentage, setNewPercentage] = useState('15');
   const [newCategory, setNewCategory] = useState('');
+  const [newCustomCategory, setNewCustomCategory] = useState('');
+  const [showCustomCategoryInput, setShowCustomCategoryInput] = useState(false);
   const [loading, setLoading] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [viewMode, setViewMode] = useState<'list' | 'grouped'>('grouped');
+
+  // Get all unique categories from products (including custom ones)
+  const allCategories = useMemo(() => {
+    const productCategories = products
+      .map(p => p.category)
+      .filter((c): c is string => !!c);
+    const uniqueCategories = [...new Set([...DEFAULT_CATEGORIES, ...productCategories])];
+    return uniqueCategories.sort();
+  }, [products]);
 
   // Group products by category
   const groupedProducts = useMemo(() => {
@@ -88,11 +99,18 @@ export const ProductCatalogDialog = ({
     setEditingId(null);
   };
 
+  const handleAddCustomCategory = () => {
+    if (newCustomCategory.trim()) {
+      setNewCategory(newCustomCategory.trim());
+      setNewCustomCategory('');
+      setShowCustomCategoryInput(false);
+    }
+  };
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim()) return;
     setLoading(true);
-    // Note: onAddProduct doesn't support category yet, we'll update after adding
     const product = await onAddProduct(newName.trim(), parseFloat(newPercentage) || 15);
     if (product && newCategory.trim()) {
       await onUpdateProduct(product.id, { category: newCategory.trim() });
@@ -144,7 +162,7 @@ export const ProductCatalogDialog = ({
             className="h-9 px-2 rounded-md border border-border bg-background text-sm"
           >
             <option value="">Sin categoría</option>
-            {CATEGORY_OPTIONS.map(cat => (
+            {allCategories.map(cat => (
               <option key={cat} value={cat}>{cat}</option>
             ))}
           </select>
@@ -239,16 +257,49 @@ export const ProductCatalogDialog = ({
                 />
                 <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
               </div>
-              <select
-                value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value)}
-                className="h-10 px-2 rounded-md border border-border bg-background text-sm min-w-[100px]"
-              >
-                <option value="">Categoría</option>
-                {CATEGORY_OPTIONS.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
+              <Popover open={showCustomCategoryInput} onOpenChange={setShowCustomCategoryInput}>
+                <PopoverTrigger asChild>
+                  <div className="flex gap-1">
+                    <select
+                      value={newCategory}
+                      onChange={(e) => setNewCategory(e.target.value)}
+                      className="h-10 px-2 rounded-md border border-border bg-background text-sm min-w-[100px]"
+                    >
+                      <option value="">Categoría</option>
+                      {allCategories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="icon" 
+                      className="h-10 w-10 shrink-0"
+                      onClick={() => setShowCustomCategoryInput(true)}
+                      title="Agregar nueva categoría"
+                    >
+                      <Tag className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-3" align="end">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Nueva categoría</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={newCustomCategory}
+                        onChange={(e) => setNewCustomCategory(e.target.value)}
+                        placeholder="Nombre de la categoría"
+                        className="flex-1"
+                        onKeyDown={(e) => e.key === 'Enter' && handleAddCustomCategory()}
+                      />
+                      <Button size="sm" onClick={handleAddCustomCategory} disabled={!newCustomCategory.trim()}>
+                        Usar
+                      </Button>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
               <Button type="submit" size="icon" disabled={loading || !newName.trim()}>
                 <Plus className="h-4 w-4" />
               </Button>
