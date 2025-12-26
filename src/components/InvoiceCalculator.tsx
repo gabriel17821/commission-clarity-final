@@ -34,23 +34,23 @@ interface Product {
 
 interface ProductLineData {
   productId: string;
-  quantitySold: number;
-  quantityFree: number;
+  quantity: number;
   unitPrice: number;
+  isOffer: boolean; // If true, this is a free item (no commission)
 }
 
 interface Breakdown {
   name: string;
   label: string;
-  amount: number; // For backward compatibility (same as netAmount)
+  amount: number;
   grossAmount: number;
   netAmount: number;
   percentage: number;
   commission: number;
   color: string;
-  quantitySold: number;
-  quantityFree: number;
+  quantity: number;
   unitPrice: number;
+  isOffer: boolean;
 }
 
 interface InvoiceCalculatorProps {
@@ -135,32 +135,36 @@ export const InvoiceCalculator = ({
     let grossTotal = 0;
     let netTotal = 0;
     let totalOfferItems = 0;
+    let totalOfferValue = 0;
 
     productLines.forEach(line => {
       const product = products.find(p => p.id === line.productId);
-      if (product) {
-        const totalQuantity = line.quantitySold + line.quantityFree;
-        const grossAmount = totalQuantity * line.unitPrice;
-        const netAmount = line.quantitySold * line.unitPrice;
+      if (product && line.quantity > 0) {
+        const lineTotal = line.quantity * line.unitPrice;
+        // If offer, it contributes to gross but NOT to net
+        const netAmount = line.isOffer ? 0 : lineTotal;
         const commission = netAmount * (product.percentage / 100);
         
-        if (line.quantitySold > 0 || line.quantityFree > 0) {
-          breakdown.push({
-            name: product.name,
-            label: product.name,
-            amount: netAmount, // For backward compatibility
-            grossAmount,
-            netAmount,
-            percentage: product.percentage,
-            commission,
-            color: product.color,
-            quantitySold: line.quantitySold,
-            quantityFree: line.quantityFree,
-            unitPrice: line.unitPrice,
-          });
-          grossTotal += grossAmount;
-          netTotal += netAmount;
-          if (line.quantityFree > 0) totalOfferItems += line.quantityFree;
+        breakdown.push({
+          name: product.name,
+          label: product.name,
+          amount: netAmount,
+          grossAmount: lineTotal,
+          netAmount,
+          percentage: product.percentage,
+          commission,
+          color: product.color,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+          isOffer: line.isOffer,
+        });
+        
+        grossTotal += lineTotal;
+        netTotal += netAmount;
+        
+        if (line.isOffer) {
+          totalOfferItems += line.quantity;
+          totalOfferValue += lineTotal;
         }
       }
     });
@@ -178,6 +182,7 @@ export const InvoiceCalculator = ({
       restCommission, 
       totalCommission,
       totalOfferItems,
+      totalOfferValue,
     };
   }, [productLines, products, restPercentage]);
 
@@ -188,7 +193,7 @@ export const InvoiceCalculator = ({
   );
 
   const handleAddLine = (productId: string) => {
-    setProductLines(prev => [...prev, { productId, quantitySold: 0, quantityFree: 0, unitPrice: 0 }]);
+    setProductLines(prev => [...prev, { productId, quantity: 0, unitPrice: 0, isOffer: false }]);
     setSearchTerm('');
     setShowSearch(false);
     toast.success("Producto agregado");
@@ -198,15 +203,9 @@ export const InvoiceCalculator = ({
     setProductLines(prev => prev.filter(l => l.productId !== productId));
   };
 
-  const handleQuantitySoldChange = (productId: string, quantitySold: number) => {
+  const handleQuantityChange = (productId: string, quantity: number) => {
     setProductLines(prev => prev.map(l => 
-      l.productId === productId ? { ...l, quantitySold } : l
-    ));
-  };
-
-  const handleQuantityFreeChange = (productId: string, quantityFree: number) => {
-    setProductLines(prev => prev.map(l => 
-      l.productId === productId ? { ...l, quantityFree } : l
+      l.productId === productId ? { ...l, quantity } : l
     ));
   };
 
@@ -216,10 +215,17 @@ export const InvoiceCalculator = ({
     ));
   };
 
+  const handleOfferChange = (productId: string, isOffer: boolean) => {
+    setProductLines(prev => prev.map(l => 
+      l.productId === productId ? { ...l, isOffer } : l
+    ));
+  };
+
   // Sync productAmounts when lines change
   useEffect(() => {
     productLines.forEach(line => {
-      const lineTotal = line.quantitySold * line.unitPrice;
+      // For offers, net amount is 0
+      const lineTotal = line.isOffer ? 0 : line.quantity * line.unitPrice;
       if (productAmounts[line.productId] !== lineTotal) {
         onProductChange(line.productId, lineTotal);
       }
@@ -245,10 +251,10 @@ export const InvoiceCalculator = ({
     setShowSaveAnimation(true);
     const fullNcf = `${ncfPrefix}${ncfSuffix.padStart(4, '0')}`;
     
-    // Build productAmounts from lines (using net amount = quantitySold * unitPrice)
+    // Build productAmounts from lines (offers have 0 net value)
     const amounts: Record<string, number> = {};
     productLines.forEach(line => {
-      amounts[line.productId] = line.quantitySold * line.unitPrice;
+      amounts[line.productId] = line.isOffer ? 0 : line.quantity * line.unitPrice;
     });
     
     await onSaveInvoice(fullNcf, format(invoiceDate, 'yyyy-MM-dd'), selectedClient?.id, amounts);
@@ -359,14 +365,13 @@ export const InvoiceCalculator = ({
           <div className="px-4 py-3 border-b border-border bg-muted/20">
             <div className="grid grid-cols-12 gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               <div className="col-span-3">Producto</div>
-              <div className="col-span-2 text-center">Vendidos</div>
-              <div className="col-span-1 text-center flex items-center justify-center gap-1">
-                <Gift className="h-3 w-3 text-amber-600" />
-                <span>Gratis</span>
-              </div>
+              <div className="col-span-2 text-center">Cantidad</div>
               <div className="col-span-2 text-center">Precio</div>
-              <div className="col-span-3 text-right">Neto → Comisión</div>
-              <div className="col-span-1"></div>
+              <div className="col-span-3 text-right">Total → Comisión</div>
+              <div className="col-span-2 text-center flex items-center justify-center gap-1">
+                <Gift className="h-3 w-3 text-amber-600" />
+                <span>Oferta</span>
+              </div>
             </div>
           </div>
 
@@ -385,12 +390,12 @@ export const InvoiceCalculator = ({
                       productName={product.name}
                       productColor={product.color}
                       percentage={product.percentage}
-                      quantitySold={line.quantitySold}
-                      quantityFree={line.quantityFree}
+                      quantity={line.quantity}
                       unitPrice={line.unitPrice}
-                      onQuantitySoldChange={(q) => handleQuantitySoldChange(line.productId, q)}
-                      onQuantityFreeChange={(q) => handleQuantityFreeChange(line.productId, q)}
+                      isOffer={line.isOffer}
+                      onQuantityChange={(q) => handleQuantityChange(line.productId, q)}
                       onUnitPriceChange={(p) => handleUnitPriceChange(line.productId, p)}
+                      onOfferChange={(o) => handleOfferChange(line.productId, o)}
                       onRemove={() => handleRemoveLine(line.productId)}
                     />
                   );
@@ -491,34 +496,81 @@ export const InvoiceCalculator = ({
           </div>
 
           {/* Totals */}
-          <div className="border-t border-border bg-muted/20 p-4 space-y-3">
-            {/* Offer indicator */}
+          <div className="border-t border-border bg-muted/20 p-4 space-y-4">
+            {/* OFFER COMPARISON BOX */}
             {calculations.totalOfferItems > 0 && (
-              <div className="flex items-center gap-2 p-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
-                <Gift className="h-4 w-4 text-amber-600" />
-                <span className="text-sm text-amber-700 dark:text-amber-300">
-                  <strong>{calculations.totalOfferItems}</strong> unidad{calculations.totalOfferItems !== 1 ? 'es' : ''} en oferta (sin comisión)
-                </span>
+              <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-300 dark:border-amber-700 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Gift className="h-5 w-5 text-amber-600" />
+                  <span className="font-bold text-amber-800 dark:text-amber-200">Resumen de Ofertas</span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-muted-foreground">Productos gratis:</p>
+                    <p className="text-lg font-bold text-amber-700 dark:text-amber-300">
+                      {calculations.totalOfferItems} unidades
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Valor regalado:</p>
+                    <p className="text-lg font-bold text-amber-700 dark:text-amber-300">
+                      ${formatNumber(calculations.totalOfferValue)}
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
             
-            {/* Gross vs Net */}
-            {calculations.grossTotal !== calculations.netTotal && (
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Total Bruto</span>
-                <span className="font-mono line-through text-muted-foreground">${formatNumber(calculations.grossTotal)}</span>
+            {/* GROSS VS NET COMPARISON */}
+            <div className="p-4 rounded-xl bg-card border border-border space-y-3">
+              <div className="grid grid-cols-2 gap-4">
+                {/* Gross Total */}
+                <div className="text-center p-3 rounded-lg bg-muted/50">
+                  <p className="text-xs uppercase text-muted-foreground font-semibold mb-1">Total Bruto</p>
+                  <p className={cn(
+                    "text-xl font-bold font-mono",
+                    calculations.grossTotal !== calculations.netTotal 
+                      ? "line-through text-muted-foreground" 
+                      : "text-foreground"
+                  )}>
+                    ${formatNumber(calculations.grossTotal)}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-1">Lo que se cobraría sin ofertas</p>
+                </div>
+                
+                {/* Net Total */}
+                <div className="text-center p-3 rounded-lg bg-primary/10 border border-primary/20">
+                  <p className="text-xs uppercase text-muted-foreground font-semibold mb-1">Total Neto</p>
+                  <p className="text-xl font-bold font-mono text-primary">
+                    ${formatNumber(calculations.netTotal)}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-1">Base para calcular comisión</p>
+                </div>
               </div>
-            )}
+              
+              {/* Difference indicator */}
+              {calculations.grossTotal !== calculations.netTotal && (
+                <div className="text-center py-2 px-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                  <p className="text-sm">
+                    <span className="text-muted-foreground">Diferencia por ofertas: </span>
+                    <span className="font-bold text-destructive">
+                      -${formatNumber(calculations.grossTotal - calculations.netTotal)}
+                    </span>
+                  </p>
+                </div>
+              )}
+            </div>
             
-            <div className="flex items-center justify-between">
+            {/* COMMISSION */}
+            <div className="flex items-center justify-between p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border-2 border-emerald-300 dark:border-emerald-700">
               <div>
-                <p className="text-sm text-muted-foreground">Total Neto (Base Comisión)</p>
-                <p className="text-2xl font-bold text-foreground">${formatNumber(calculations.netTotal)}</p>
+                <p className="text-sm font-semibold text-muted-foreground">MI COMISIÓN REAL</p>
+                <p className="text-xs text-muted-foreground">Basada en total neto</p>
               </div>
-              <div className="text-right">
-                <p className="text-sm text-muted-foreground">Mi Comisión Real</p>
-                <p className="text-2xl font-bold text-emerald-600">${formatCurrency(calculations.totalCommission)}</p>
-              </div>
+              <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                ${formatCurrency(calculations.totalCommission)}
+              </p>
             </div>
           </div>
 
