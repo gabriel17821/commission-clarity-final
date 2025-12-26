@@ -9,13 +9,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Upload, Download, FileText, AlertCircle, CheckCircle2, Loader2, XCircle, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { parse, format } from 'date-fns';
@@ -629,20 +623,15 @@ B0100002905,2024-11-01,FARMACIA CENTRAL,CETERIPLEX CETIRIZINA TAB 1/100,3,900.0`
               <div className="space-y-2 max-h-40 overflow-y-auto">
                 {unmatchedProducts.map((csvName) => (
                   <div key={csvName} className="flex items-center gap-2 p-2 bg-background rounded border">
-                    <span className="text-sm font-medium flex-1 truncate">{csvName}</span>
+                    <span className="text-sm font-medium flex-1 truncate" title={csvName}>{csvName}</span>
                     <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <Select onValueChange={(value) => handleManualProductMatch(csvName, value)}>
-                      <SelectTrigger className="w-64">
-                        <SelectValue placeholder="Seleccionar producto..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {products.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name} ({p.percentage}%)
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      options={products.map(p => ({ value: p.id, label: p.name, sublabel: `${p.percentage}%` }))}
+                      onValueChange={(value) => handleManualProductMatch(csvName, value)}
+                      placeholder="Buscar producto..."
+                      searchPlaceholder="Escribir para buscar..."
+                      className="w-64"
+                    />
                   </div>
                 ))}
               </div>
@@ -662,20 +651,15 @@ B0100002905,2024-11-01,FARMACIA CENTRAL,CETERIPLEX CETIRIZINA TAB 1/100,3,900.0`
               <div className="space-y-2 max-h-32 overflow-y-auto">
                 {unmatchedClients.map((csvName) => (
                   <div key={csvName} className="flex items-center gap-2 p-2 bg-background rounded border">
-                    <span className="text-sm font-medium flex-1 truncate">{csvName}</span>
+                    <span className="text-sm font-medium flex-1 truncate" title={csvName}>{csvName}</span>
                     <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <Select onValueChange={(value) => handleManualClientMatch(csvName, value)}>
-                      <SelectTrigger className="w-64">
-                        <SelectValue placeholder="Seleccionar cliente..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clients.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      options={clients.map(c => ({ value: c.id, label: c.name }))}
+                      onValueChange={(value) => handleManualClientMatch(csvName, value)}
+                      placeholder="Buscar cliente..."
+                      searchPlaceholder="Escribir para buscar..."
+                      className="w-64"
+                    />
                   </div>
                 ))}
               </div>
