@@ -77,14 +77,14 @@ export function SalesAnalysisDashboard({ invoices, clients, products, sellers }:
   };
 
   return (
-    <div className="space-y-6">
+    <main className="space-y-6">
       {/* Header with Date Filter */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Centro de Análisis</h2>
-          <p className="text-muted-foreground">Inteligencia comercial para decisiones estratégicas</p>
+      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Centro de Análisis</h1>
+          <p className="text-sm text-muted-foreground">Dashboard SaaS para ventas, clientes y ofertas</p>
         </div>
-        
+
         <div className="flex items-center gap-2 flex-wrap">
           <Select value={datePreset} onValueChange={handlePresetChange}>
             <SelectTrigger className="w-44">
@@ -106,7 +106,7 @@ export function SalesAnalysisDashboard({ invoices, clients, products, sellers }:
               <PopoverTrigger asChild>
                 <Button variant="outline" className="gap-2">
                   <CalendarIcon className="h-4 w-4" />
-                  {customRange.from && customRange.to 
+                  {customRange.from && customRange.to
                     ? `${format(customRange.from, 'dd/MM/yy')} - ${format(customRange.to, 'dd/MM/yy')}`
                     : 'Seleccionar fechas'
                   }
@@ -124,81 +124,83 @@ export function SalesAnalysisDashboard({ invoices, clients, products, sellers }:
             </Popover>
           )}
         </div>
-      </div>
+      </header>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5 h-12 p-1 bg-muted rounded-xl">
-          <TabsTrigger value="ventoview" className="gap-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <Zap className="h-4 w-4" />
-            <span className="hidden sm:inline">VentoView</span>
-          </TabsTrigger>
-          <TabsTrigger value="gifts" className="gap-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <Gift className="h-4 w-4" />
-            <span className="hidden sm:inline">Regalos</span>
-          </TabsTrigger>
-          <TabsTrigger value="map" className="gap-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <MapPin className="h-4 w-4" />
-            <span className="hidden sm:inline">Mapa</span>
-          </TabsTrigger>
-          <TabsTrigger value="products" className="gap-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <BarChart3 className="h-4 w-4" />
-            <span className="hidden sm:inline">Productos</span>
-          </TabsTrigger>
-          <TabsTrigger value="clients" className="gap-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <User className="h-4 w-4" />
-            <span className="hidden sm:inline">Clientes</span>
-          </TabsTrigger>
-        </TabsList>
+      <section aria-label="Módulos de análisis">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="w-full h-12 p-1 bg-muted rounded-xl flex flex-wrap justify-start gap-1">
+            <TabsTrigger value="ventoview" className="gap-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Zap className="h-4 w-4" />
+              <span>VentoView</span>
+            </TabsTrigger>
+            <TabsTrigger value="gifts" className="gap-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Gift className="h-4 w-4" />
+              <span>Ofertas</span>
+            </TabsTrigger>
+            <TabsTrigger value="map" className="gap-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <MapPin className="h-4 w-4" />
+              <span>Mapa</span>
+            </TabsTrigger>
+            <TabsTrigger value="products" className="gap-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <BarChart3 className="h-4 w-4" />
+              <span>Productos</span>
+            </TabsTrigger>
+            <TabsTrigger value="clients" className="gap-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <User className="h-4 w-4" />
+              <span>Clientes</span>
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="ventoview">
-          <VentoView 
-            invoices={invoices} 
-            clients={clients} 
-            products={products} 
-            dateRange={dateRange}
-            onNavigate={(tab) => setActiveTab(tab)}
-          />
-        </TabsContent>
+          <TabsContent value="ventoview">
+            <VentoView
+              invoices={invoices}
+              clients={clients}
+              products={products}
+              dateRange={dateRange}
+              onNavigate={(tab) => setActiveTab(tab)}
+            />
+          </TabsContent>
 
-        <TabsContent value="gifts">
-          <GiftMarginAnalysis 
-            invoices={invoices} 
-            products={products} 
-            sellers={sellers}
-            dateRange={dateRange}
-          />
-        </TabsContent>
+          <TabsContent value="gifts">
+            <GiftMarginAnalysis
+              invoices={invoices}
+              products={products}
+              sellers={sellers}
+              dateRange={dateRange}
+            />
+          </TabsContent>
 
-        <TabsContent value="map">
-          <InteractiveMap 
-            invoices={invoices} 
-            clients={clients} 
-            products={products} 
-            dateRange={dateRange}
-            onClientSelect={handleClientSelectFromMap}
-          />
-        </TabsContent>
+          <TabsContent value="map">
+            <InteractiveMap
+              invoices={invoices}
+              clients={clients}
+              products={products}
+              dateRange={dateRange}
+              onClientSelect={handleClientSelectFromMap}
+            />
+          </TabsContent>
 
-        <TabsContent value="products">
-          <ProductAnalysis 
-            invoices={invoices} 
-            products={products} 
-            dateRange={dateRange} 
-          />
-        </TabsContent>
+          <TabsContent value="products">
+            <ProductAnalysis
+              invoices={invoices}
+              products={products}
+              dateRange={dateRange}
+            />
+          </TabsContent>
 
-        <TabsContent value="clients">
-          <ClientAnalysis 
-            invoices={invoices} 
-            clients={clients} 
-            products={products} 
-            dateRange={dateRange}
-            initialClient={selectedClientFromMap}
-            onClose={() => setSelectedClientFromMap(null)}
-          />
-        </TabsContent>
-      </Tabs>
-    </div>
+          <TabsContent value="clients">
+            <ClientAnalysis
+              invoices={invoices}
+              clients={clients}
+              products={products}
+              dateRange={dateRange}
+              initialClient={selectedClientFromMap}
+              onClose={() => setSelectedClientFromMap(null)}
+            />
+          </TabsContent>
+        </Tabs>
+      </section>
+    </main>
   );
 }
