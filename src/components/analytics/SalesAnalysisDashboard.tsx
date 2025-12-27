@@ -10,7 +10,7 @@ import { Invoice } from '@/hooks/useInvoices';
 import { Client } from '@/hooks/useClients';
 import { Product } from '@/hooks/useProducts';
 import { Seller } from '@/hooks/useSellers';
-import { ActionDashboard } from './ActionDashboard';
+import { AnalysisCenterLayout } from './AnalysisCenterLayout';
 
 type DatePreset = 'today' | '7d' | '30d' | 'month' | 'lastMonth' | 'custom';
 
@@ -118,8 +118,8 @@ export function SalesAnalysisDashboard({ invoices, clients, products, sellers }:
         </div>
       </header>
 
-      {/* Dashboard */}
-      <ActionDashboard
+      {/* Analysis Center Layout */}
+      <AnalysisCenterLayout
         invoices={invoices}
         clients={clients}
         products={products}
