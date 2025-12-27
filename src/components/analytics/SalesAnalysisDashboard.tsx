@@ -13,7 +13,7 @@ import { Invoice } from '@/hooks/useInvoices';
 import { Client } from '@/hooks/useClients';
 import { Product } from '@/hooks/useProducts';
 import { VentoView } from './VentoView';
-import { DominicanRepublicMap } from './DominicanRepublicMap';
+import { InteractiveMap } from './InteractiveMap';
 import { ProductAnalysis } from './ProductAnalysis';
 import { ClientAnalysis } from './ClientAnalysis';
 
@@ -149,12 +149,13 @@ export function SalesAnalysisDashboard({ invoices, clients, products }: SalesAna
             invoices={invoices} 
             clients={clients} 
             products={products} 
-            dateRange={dateRange} 
+            dateRange={dateRange}
+            onNavigate={(tab) => setActiveTab(tab)}
           />
         </TabsContent>
 
         <TabsContent value="map">
-          <DominicanRepublicMap 
+          <InteractiveMap 
             invoices={invoices} 
             clients={clients} 
             products={products} 
