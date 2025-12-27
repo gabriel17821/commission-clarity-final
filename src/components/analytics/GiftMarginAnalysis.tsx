@@ -54,25 +54,55 @@ export function GiftMarginAnalysis({ invoices, products, sellers, dateRange }: G
       allProducts = allProducts.filter(p => p.product_name === selectedProduct);
     }
 
-    // Calculate totals
-    const totalUnitsSold = allProducts.reduce((sum, p) => sum + (p.quantity_sold || 0), 0);
-    const totalUnitsGifted = allProducts.reduce((sum, p) => sum + (p.quantity_free || 0), 0);
+    // Helpers: infer missing qty/value from gross/net when legacy rows don't have offer fields filled
+    const getUnitPrice = (p: any) => Number(p.unit_price ?? 0);
+    const getNetAmount = (p: any) => Number(p.net_amount ?? p.amount ?? 0);
+    const getGrossAmount = (p: any) => {
+      const gross = Number(p.gross_amount ?? 0);
+      // Legacy rows may not have gross_amount populated; fall back to amount (what was recorded)
+      return gross > 0 ? gross : Number(p.amount ?? 0);
+    };
+    const getGiftValueMoney = (p: any) => {
+      const gross = getGrossAmount(p);
+      const net = getNetAmount(p);
+      return Math.max(0, gross - net);
+    };
+    const inferSoldUnits = (p: any) => {
+      const explicit = Number(p.quantity_sold ?? 0);
+      if (explicit > 0) return explicit;
+      const price = getUnitPrice(p);
+      const net = getNetAmount(p);
+      return price > 0 ? net / price : 0;
+    };
+    const inferGiftedUnits = (p: any) => {
+      const explicit = Number(p.quantity_free ?? 0);
+      if (explicit > 0) return explicit;
+      const price = getUnitPrice(p);
+      const giftMoney = getGiftValueMoney(p);
+      return price > 0 ? giftMoney / price : 0;
+    };
+
+    // Calculate totals (robust for legacy data)
+    const totalUnitsSold = allProducts.reduce((sum, p) => sum + inferSoldUnits(p), 0);
+    const totalUnitsGifted = allProducts.reduce((sum, p) => sum + inferGiftedUnits(p), 0);
     const totalUnits = totalUnitsSold + totalUnitsGifted;
     const giftPercentage = totalUnits > 0 ? (totalUnitsGifted / totalUnits) * 100 : 0;
 
     // Financial calculations
-    const grossRevenue = allProducts.reduce((sum, p) => sum + (p.net_amount || 0), 0); // What client paid
-    const giftValue = allProducts.reduce((sum, p) => sum + ((p.quantity_free || 0) * (p.unit_price || 0)), 0);
-    const theoreticalRevenue = grossRevenue + giftValue; // If no gifts existed
-    const netRealRevenue = grossRevenue; // Actual received
+    // What client actually paid (net)
+    const netRealRevenue = allProducts.reduce((sum, p) => sum + getNetAmount(p), 0);
+    // Total monetary value given away (money left on the table)
+    const giftValue = allProducts.reduce((sum, p) => sum + getGiftValueMoney(p), 0);
+    // If no gifts existed, you'd capture the full gross value
+    const theoreticalRevenue = allProducts.reduce((sum, p) => sum + getGrossAmount(p), 0);
+    const grossRevenue = netRealRevenue;
     const marginImpact = theoreticalRevenue > 0 ? ((giftValue / theoreticalRevenue) * 100) : 0;
 
     // Commission analysis
-    const totalCommissionPaid = allProducts.reduce((sum, p) => sum + (p.commission || 0), 0);
-    // Check if commission was calculated on gross (including gifts) - this would be incorrect
+    const totalCommissionPaid = allProducts.reduce((sum, p) => sum + Number(p.commission ?? 0), 0);
     const correctCommission = allProducts.reduce((sum, p) => {
-      const netAmount = p.net_amount || 0;
-      const percentage = p.percentage || 0;
+      const netAmount = getNetAmount(p);
+      const percentage = Number(p.percentage ?? 0);
       return sum + (netAmount * percentage / 100);
     }, 0);
     const commissionDifference = totalCommissionPaid - correctCommission;
@@ -80,13 +110,13 @@ export function GiftMarginAnalysis({ invoices, products, sellers, dateRange }: G
     // Analysis by seller
     const sellerAnalysis = sellers.map(seller => {
       const sellerProducts = allProducts.filter(p => p.seller_id === seller.id);
-      const soldUnits = sellerProducts.reduce((sum, p) => sum + (p.quantity_sold || 0), 0);
-      const giftedUnits = sellerProducts.reduce((sum, p) => sum + (p.quantity_free || 0), 0);
-      const revenue = sellerProducts.reduce((sum, p) => sum + (p.net_amount || 0), 0);
-      const giftVal = sellerProducts.reduce((sum, p) => sum + ((p.quantity_free || 0) * (p.unit_price || 0)), 0);
-      const commission = sellerProducts.reduce((sum, p) => sum + (p.commission || 0), 0);
+      const soldUnits = sellerProducts.reduce((sum, p) => sum + inferSoldUnits(p), 0);
+      const giftedUnits = sellerProducts.reduce((sum, p) => sum + inferGiftedUnits(p), 0);
+      const revenue = sellerProducts.reduce((sum, p) => sum + getNetAmount(p), 0);
+      const giftVal = sellerProducts.reduce((sum, p) => sum + getGiftValueMoney(p), 0);
+      const commission = sellerProducts.reduce((sum, p) => sum + Number(p.commission ?? 0), 0);
       const correctComm = sellerProducts.reduce((sum, p) => {
-        return sum + ((p.net_amount || 0) * (p.percentage || 0) / 100);
+        return sum + (getNetAmount(p) * Number(p.percentage ?? 0) / 100);
       }, 0);
 
       return {
@@ -108,11 +138,11 @@ export function GiftMarginAnalysis({ invoices, products, sellers, dateRange }: G
     const productNames = [...new Set(allProducts.map(p => p.product_name))];
     const productAnalysis = productNames.map(name => {
       const prods = allProducts.filter(p => p.product_name === name);
-      const soldUnits = prods.reduce((sum, p) => sum + (p.quantity_sold || 0), 0);
-      const giftedUnits = prods.reduce((sum, p) => sum + (p.quantity_free || 0), 0);
-      const revenue = prods.reduce((sum, p) => sum + (p.net_amount || 0), 0);
-      const avgPrice = prods.length > 0 ? prods.reduce((sum, p) => sum + (p.unit_price || 0), 0) / prods.length : 0;
-      const giftVal = giftedUnits * avgPrice;
+      const soldUnits = prods.reduce((sum, p) => sum + inferSoldUnits(p), 0);
+      const giftedUnits = prods.reduce((sum, p) => sum + inferGiftedUnits(p), 0);
+      const revenue = prods.reduce((sum, p) => sum + getNetAmount(p), 0);
+      const giftVal = prods.reduce((sum, p) => sum + getGiftValueMoney(p), 0);
+      const avgPrice = soldUnits > 0 ? (revenue / soldUnits) : 0;
 
       return {
         name,

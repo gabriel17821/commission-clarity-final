@@ -48,6 +48,8 @@ interface Breakdown {
   commission: number;
   color: string;
   isOffer: boolean;
+  quantity: number;
+  unitPrice: number;
 }
 
 interface Calculations {
@@ -75,7 +77,24 @@ interface CalculatorViewProps {
   onAddProduct: (name: string, percentage: number) => Promise<any>;
   onUpdateProduct: (id: string, updates: Partial<Product>) => Promise<boolean>;
   onDeleteProduct: (id: string) => void;
-  onSaveInvoice: (ncf: string, invoiceDate: string, products: { name: string; amount: number; percentage: number; commission: number }[], totalAmount: number, totalCommission: number, clientId?: string) => Promise<any>;
+  onSaveInvoice: (
+    ncf: string,
+    invoiceDate: string,
+    products: {
+      name: string;
+      amount: number;
+      percentage: number;
+      commission: number;
+      quantity_sold?: number;
+      quantity_free?: number;
+      unit_price?: number;
+      gross_amount?: number;
+      net_amount?: number;
+    }[],
+    totalAmount: number,
+    totalCommission: number,
+    clientId?: string
+  ) => Promise<any>;
   onBulkImport?: (invoices: { ncfSuffix: string; invoiceDate: Date; clientId?: string; lines: { productId: string; quantity: number; unitPrice: number }[] }[]) => Promise<void>;
   suggestedNcf?: number | null;
   lastInvoice?: Invoice;
@@ -168,6 +187,8 @@ export const CalculatorView = ({
           commission,
           color: product.color,
           isOffer: line.isOffer,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
         });
         
         grossTotal += grossAmount;
@@ -275,16 +296,33 @@ export const CalculatorView = ({
     setShowPreviewDialog(false);
     setShowSaveAnimation(true);
     const fullNcf = `${ncfPrefix}${ncfSuffix.padStart(4, '0')}`;
-    
-    // Preparar los productos con sus datos correctos
-    const productData = calculations.breakdown.map(b => ({
-      name: b.name,
-      amount: b.amount,
-      percentage: b.percentage,
-      commission: b.commission,
-    }));
-    
-    await onSaveInvoice(fullNcf, format(invoiceDate, 'yyyy-MM-dd'), productData, actualTotal, calculations.totalCommission, selectedClient?.id);
+
+    // Preparar los productos con datos de ofertas (vendido vs regalado)
+    const productData = calculations.breakdown.map(b => {
+      const soldQty = b.isOffer ? 0 : b.quantity;
+      const freeQty = b.isOffer ? b.quantity : 0;
+
+      return {
+        name: b.name,
+        amount: b.amount,
+        percentage: b.percentage,
+        commission: b.commission,
+        quantity_sold: soldQty,
+        quantity_free: freeQty,
+        unit_price: b.unitPrice,
+        gross_amount: b.grossAmount,
+        net_amount: b.netAmount,
+      };
+    });
+
+    await onSaveInvoice(
+      fullNcf,
+      format(invoiceDate, 'yyyy-MM-dd'),
+      productData,
+      actualTotal,
+      calculations.totalCommission,
+      selectedClient?.id
+    );
     setIsSaving(false);
   };
 

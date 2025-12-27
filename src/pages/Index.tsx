@@ -56,6 +56,8 @@ const Index = () => {
       commission: (productAmounts[product.id] || 0) * (product.percentage / 100),
       color: product.color,
       isOffer: false,
+      quantity: 0,
+      unitPrice: 0,
     }));
 
     const specialProductsTotal = Object.values(productAmounts).reduce(
@@ -88,7 +90,17 @@ const Index = () => {
   const handleSaveInvoice = async (
     ncf: string, 
     invoiceDate: string, 
-    products: { name: string; amount: number; percentage: number; commission: number }[],
+    products: {
+      name: string;
+      amount: number;
+      percentage: number;
+      commission: number;
+      quantity_sold?: number;
+      quantity_free?: number;
+      unit_price?: number;
+      gross_amount?: number;
+      net_amount?: number;
+    }[],
     totalAmount: number,
     totalCommission: number,
     clientId?: string
