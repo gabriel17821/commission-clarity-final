@@ -5,17 +5,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { 
-  Zap, MapPin, BarChart3, User, Calendar as CalendarIcon 
+  Zap, MapPin, BarChart3, User, Calendar as CalendarIcon, Gift
 } from 'lucide-react';
 import { format, subDays, subMonths, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Invoice } from '@/hooks/useInvoices';
 import { Client } from '@/hooks/useClients';
 import { Product } from '@/hooks/useProducts';
+import { Seller } from '@/hooks/useSellers';
 import { VentoView } from './VentoView';
 import { InteractiveMap } from './InteractiveMap';
 import { ProductAnalysis } from './ProductAnalysis';
 import { ClientAnalysis } from './ClientAnalysis';
+import { GiftMarginAnalysis } from './GiftMarginAnalysis';
 
 type DatePreset = 'today' | '7d' | '30d' | 'month' | 'lastMonth' | 'custom';
 
@@ -23,9 +25,10 @@ interface SalesAnalysisDashboardProps {
   invoices: Invoice[];
   clients: Client[];
   products: Product[];
+  sellers: Seller[];
 }
 
-export function SalesAnalysisDashboard({ invoices, clients, products }: SalesAnalysisDashboardProps) {
+export function SalesAnalysisDashboard({ invoices, clients, products, sellers }: SalesAnalysisDashboardProps) {
   const [datePreset, setDatePreset] = useState<DatePreset>('30d');
   const [customRange, setCustomRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ 
     from: undefined, 
@@ -125,10 +128,14 @@ export function SalesAnalysisDashboard({ invoices, clients, products }: SalesAna
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 h-12 p-1 bg-muted rounded-xl">
+        <TabsList className="grid w-full grid-cols-5 h-12 p-1 bg-muted rounded-xl">
           <TabsTrigger value="ventoview" className="gap-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Zap className="h-4 w-4" />
             <span className="hidden sm:inline">VentoView</span>
+          </TabsTrigger>
+          <TabsTrigger value="gifts" className="gap-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Gift className="h-4 w-4" />
+            <span className="hidden sm:inline">Regalos</span>
           </TabsTrigger>
           <TabsTrigger value="map" className="gap-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <MapPin className="h-4 w-4" />
@@ -151,6 +158,15 @@ export function SalesAnalysisDashboard({ invoices, clients, products }: SalesAna
             products={products} 
             dateRange={dateRange}
             onNavigate={(tab) => setActiveTab(tab)}
+          />
+        </TabsContent>
+
+        <TabsContent value="gifts">
+          <GiftMarginAnalysis 
+            invoices={invoices} 
+            products={products} 
+            sellers={sellers}
+            dateRange={dateRange}
           />
         </TabsContent>
 
