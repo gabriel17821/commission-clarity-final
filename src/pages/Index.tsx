@@ -279,6 +279,7 @@ const Index = () => {
               invoices={invoices}
               clients={clients}
               products={products}
+              sellers={sellers}
             />
           </TabsContent>
         </Tabs>
