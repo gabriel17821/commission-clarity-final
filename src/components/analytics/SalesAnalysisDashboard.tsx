@@ -1,23 +1,16 @@
 import { useState } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { 
-  Zap, MapPin, BarChart3, User, Calendar as CalendarIcon, Gift
-} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Calendar as CalendarIcon, BarChart3 } from 'lucide-react';
 import { format, subDays, subMonths, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Invoice } from '@/hooks/useInvoices';
 import { Client } from '@/hooks/useClients';
 import { Product } from '@/hooks/useProducts';
 import { Seller } from '@/hooks/useSellers';
-import { VentoView } from './VentoView';
-import { InteractiveMap } from './InteractiveMap';
-import { ProductAnalysis } from './ProductAnalysis';
-import { ClientAnalysis } from './ClientAnalysis';
-import { GiftMarginAnalysis } from './GiftMarginAnalysis';
+import { ActionDashboard } from './ActionDashboard';
 
 type DatePreset = 'today' | '7d' | '30d' | 'month' | 'lastMonth' | 'custom';
 
@@ -34,10 +27,7 @@ export function SalesAnalysisDashboard({ invoices, clients, products, sellers }:
     from: undefined, 
     to: undefined 
   });
-  const [selectedClientFromMap, setSelectedClientFromMap] = useState<Client | null>(null);
-  const [activeTab, setActiveTab] = useState('ventoview');
 
-  // Calculate date range based on preset
   const getDateRange = () => {
     const now = new Date();
     switch (datePreset) {
@@ -64,11 +54,6 @@ export function SalesAnalysisDashboard({ invoices, clients, products, sellers }:
 
   const dateRange = getDateRange();
 
-  const handleClientSelectFromMap = (client: Client) => {
-    setSelectedClientFromMap(client);
-    setActiveTab('clients');
-  };
-
   const handlePresetChange = (value: DatePreset) => {
     setDatePreset(value);
     if (value !== 'custom') {
@@ -77,24 +62,31 @@ export function SalesAnalysisDashboard({ invoices, clients, products, sellers }:
   };
 
   return (
-    <main className="space-y-6">
-      {/* Header with Date Filter */}
-      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Centro de Análisis</h1>
-          <p className="text-sm text-muted-foreground">Dashboard SaaS para ventas, clientes y ofertas</p>
+    <main className="space-y-4">
+      {/* Header */}
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <BarChart3 className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold text-foreground">Centro de Análisis</h1>
+            <p className="text-xs text-muted-foreground">
+              {format(dateRange.from, 'dd MMM', { locale: es })} - {format(dateRange.to, 'dd MMM yyyy', { locale: es })}
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           <Select value={datePreset} onValueChange={handlePresetChange}>
-            <SelectTrigger className="w-44">
+            <SelectTrigger className="w-40 h-9">
               <CalendarIcon className="h-4 w-4 mr-2" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="today">Hoy</SelectItem>
-              <SelectItem value="7d">Últimos 7 días</SelectItem>
-              <SelectItem value="30d">Últimos 30 días</SelectItem>
+              <SelectItem value="7d">7 días</SelectItem>
+              <SelectItem value="30d">30 días</SelectItem>
               <SelectItem value="month">Mes actual</SelectItem>
               <SelectItem value="lastMonth">Mes anterior</SelectItem>
               <SelectItem value="custom">Personalizado</SelectItem>
@@ -104,11 +96,11 @@ export function SalesAnalysisDashboard({ invoices, clients, products, sellers }:
           {datePreset === 'custom' && (
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="gap-2">
+                <Button variant="outline" size="sm" className="gap-2">
                   <CalendarIcon className="h-4 w-4" />
                   {customRange.from && customRange.to
                     ? `${format(customRange.from, 'dd/MM/yy')} - ${format(customRange.to, 'dd/MM/yy')}`
-                    : 'Seleccionar fechas'
+                    : 'Fechas'
                   }
                 </Button>
               </PopoverTrigger>
@@ -126,81 +118,14 @@ export function SalesAnalysisDashboard({ invoices, clients, products, sellers }:
         </div>
       </header>
 
-      {/* Tabs */}
-      <section aria-label="Módulos de análisis">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="w-full h-12 p-1 bg-muted rounded-xl flex flex-wrap justify-start gap-1">
-            <TabsTrigger value="ventoview" className="gap-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Zap className="h-4 w-4" />
-              <span>VentoView</span>
-            </TabsTrigger>
-            <TabsTrigger value="gifts" className="gap-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Gift className="h-4 w-4" />
-              <span>Ofertas</span>
-            </TabsTrigger>
-            <TabsTrigger value="map" className="gap-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <MapPin className="h-4 w-4" />
-              <span>Mapa</span>
-            </TabsTrigger>
-            <TabsTrigger value="products" className="gap-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <BarChart3 className="h-4 w-4" />
-              <span>Productos</span>
-            </TabsTrigger>
-            <TabsTrigger value="clients" className="gap-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <User className="h-4 w-4" />
-              <span>Clientes</span>
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="ventoview">
-            <VentoView
-              invoices={invoices}
-              clients={clients}
-              products={products}
-              dateRange={dateRange}
-              onNavigate={(tab) => setActiveTab(tab)}
-            />
-          </TabsContent>
-
-          <TabsContent value="gifts">
-            <GiftMarginAnalysis
-              invoices={invoices}
-              products={products}
-              sellers={sellers}
-              dateRange={dateRange}
-            />
-          </TabsContent>
-
-          <TabsContent value="map">
-            <InteractiveMap
-              invoices={invoices}
-              clients={clients}
-              products={products}
-              dateRange={dateRange}
-              onClientSelect={handleClientSelectFromMap}
-            />
-          </TabsContent>
-
-          <TabsContent value="products">
-            <ProductAnalysis
-              invoices={invoices}
-              products={products}
-              dateRange={dateRange}
-            />
-          </TabsContent>
-
-          <TabsContent value="clients">
-            <ClientAnalysis
-              invoices={invoices}
-              clients={clients}
-              products={products}
-              dateRange={dateRange}
-              initialClient={selectedClientFromMap}
-              onClose={() => setSelectedClientFromMap(null)}
-            />
-          </TabsContent>
-        </Tabs>
-      </section>
+      {/* Dashboard */}
+      <ActionDashboard
+        invoices={invoices}
+        clients={clients}
+        products={products}
+        sellers={sellers}
+        dateRange={dateRange}
+      />
     </main>
   );
 }
